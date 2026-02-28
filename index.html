@@ -94,13 +94,38 @@ body.lang-de .barn::before { content: 'Kinder: '; }
 
 /* ── Main layout ── */
 #main { flex: 1; display: flex; overflow: hidden; }
+#zoom-layer { position: relative; }
+
+/* ── Zoom controls ── */
+#zoom-controls {
+  position: fixed; bottom: 22px; left: 18px; z-index: 20;
+  display: flex; flex-direction: column; gap: 5px;
+}
+.zoom-btn {
+  width: 38px; height: 38px; border-radius: 50%;
+  border: 1.5px solid #ccc; background: white;
+  font-size: 22px; font-weight: 300; line-height: 1; padding: 0;
+  cursor: pointer; color: #555;
+  box-shadow: 0 2px 8px rgba(0,0,0,.13);
+  display: flex; align-items: center; justify-content: center;
+  transition: background .1s;
+}
+.zoom-btn:hover { background: #f0f0f0; }
 
 /* ── Detail panel ── */
 #detail {
   width: 272px; flex-shrink: 0;
   background: #fafafa; border-left: 1px solid #ddd;
   display: flex; flex-direction: column; overflow: hidden;
+  transition: width .2s ease;
 }
+#detail.collapsed { width: 0; }
+#det-close {
+  margin-left: auto; flex-shrink: 0;
+  background: none; border: none; font-size: 17px;
+  color: #bbb; cursor: pointer; padding: 0 2px; line-height: 1;
+}
+#det-close:hover { color: #666; }
 .det-head {
   padding: 14px 16px; display: flex; align-items: center; gap: 12px;
   border-bottom: 1px solid #eee; flex-shrink: 0;
@@ -145,13 +170,20 @@ body.lang-de .barn::before { content: 'Kinder: '; }
 
 <div id="main">
   <div id="viewport">
-    <div id="wrap">
-      <canvas id="cv"></canvas>
+    <div id="zoom-layer">
+      <div id="wrap">
+        <canvas id="cv"></canvas>
+      </div>
     </div>
   </div>
   <div id="detail">
     <div class="det-empty">Välj en person i trädet</div>
   </div>
+</div>
+
+<div id="zoom-controls">
+  <button class="zoom-btn" id="zoom-in">+</button>
+  <button class="zoom-btn" id="zoom-out">−</button>
 </div>
 
 <script>
@@ -367,6 +399,7 @@ function getSpouses(id) {
 const detPanel = document.getElementById('detail');
 
 function renderDetail(id) {
+  detPanel.classList.remove('collapsed');
   if (!id || !P[id]) { detPanel.innerHTML = `<div class="det-empty">${LANG[lang].detEmpty}</div>`; return; }
   const p   = P[id];
   const col = COLORS[p.c] || '#bbb';
@@ -380,10 +413,11 @@ function renderDetail(id) {
   // Header
   html += `<div class="det-head" style="background:${col}18; border-left:4px solid ${col}">
     <div class="det-av" style="background:${col}">${p.s==='F'?'♀':'♂'}</div>
-    <div>
+    <div style="flex:1;min-width:0">
       <div class="det-name">${p.n}</div>
       <div class="det-dates">${p.b?'*'+p.b:''}${p.b&&p.d?'&ensp;':''}${p.d?'†'+p.d:''}</div>
     </div>
+    <button id="det-close" title="Stäng">×</button>
   </div>`;
 
   html += '<div class="det-body">';
@@ -436,6 +470,9 @@ function renderDetail(id) {
 
   html += '</div>'; // det-body
   detPanel.innerHTML = html;
+  document.getElementById('det-close').addEventListener('click', () => {
+    detPanel.classList.add('collapsed');
+  });
 }
 
 // ════ STATE ════
@@ -628,9 +665,14 @@ function render(rootId) {
 
       card.appendChild(info);
 
-      // Click on card itself = focus (unless already focused)
+      // Click on card itself = focus, or re-open panel if already focused
       if (!isFocus) {
         card.addEventListener('click', () => focusPerson(id));
+      } else {
+        card.addEventListener('click', () => {
+          detPanel.classList.remove('collapsed');
+          renderDetail(id);
+        });
       }
 
       wrap.appendChild(card);
@@ -690,11 +732,56 @@ function render(rootId) {
 
     // Redraw lines with corrected positions
     drawLines(ctx, slots, pos);
+    applyZoom();
   });
 
   // Update header
   focusName.textContent = P[rootId] ? P[rootId].n : '';
 }
+
+// ════ ZOOM ════
+let zoom = 1;
+const zoomLayer = document.getElementById('zoom-layer');
+
+function applyZoom() {
+  wrap.style.transform = `scale(${zoom})`;
+  wrap.style.transformOrigin = 'top left';
+  const w = parseFloat(wrap.style.width)  || 0;
+  const h = parseFloat(wrap.style.height) || 0;
+  zoomLayer.style.width  = (w * zoom) + 'px';
+  zoomLayer.style.height = (h * zoom) + 'px';
+}
+
+document.getElementById('zoom-in').addEventListener('click', () => {
+  zoom = Math.min(2.2, zoom + 0.15); applyZoom();
+});
+document.getElementById('zoom-out').addEventListener('click', () => {
+  zoom = Math.max(0.3, zoom - 0.15); applyZoom();
+});
+
+// Pinch-to-zoom
+let pinchDist0 = null, zoom0 = 1;
+viewport.addEventListener('touchstart', e => {
+  if (e.touches.length === 2) {
+    pinchDist0 = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    zoom0 = zoom;
+  }
+}, { passive: true });
+viewport.addEventListener('touchmove', e => {
+  if (e.touches.length === 2 && pinchDist0) {
+    const d = Math.hypot(
+      e.touches[0].clientX - e.touches[1].clientX,
+      e.touches[0].clientY - e.touches[1].clientY
+    );
+    zoom = Math.max(0.3, Math.min(2.2, zoom0 * (d / pinchDist0)));
+    applyZoom();
+    e.preventDefault();
+  }
+}, { passive: false });
+viewport.addEventListener('touchend', () => { pinchDist0 = null; });
 
 // ════ LANGUAGE ════
 function setLang(l) {
