@@ -29,21 +29,21 @@ canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
 
 /* ── Card ── */
 .card {
-  position: absolute; display: flex; align-items: flex-start; gap: 8px;
-  padding: 8px 12px 8px 8px; border-radius: 18px; border: 2.5px solid;
-  width: 210px; transform: translateY(-50%);
+  position: absolute; display: flex; align-items: flex-start; gap: 5px;
+  padding: 5px 8px 5px 6px; border-radius: 14px; border: 2px solid;
+  width: 168px; transform: translateY(-50%);
   background: white; cursor: pointer;
   transition: filter .12s, box-shadow .12s;
 }
 .card:hover { filter: brightness(.96); box-shadow: 0 3px 12px rgba(0,0,0,.14); z-index: 5; }
 .card.focused { box-shadow: 0 0 0 3px rgba(100,80,200,.35); z-index: 6; cursor: default; }
 
-.av { width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 16px; color: white; margin-top: 1px; }
+.av { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; color: white; margin-top: 1px; }
 
 .info { flex: 1; min-width: 0; }
-.nm { font-size: 12.5px; font-weight: 700; color: #222; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dt { font-size: 10.5px; color: #888; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.note { font-size: 10px; color: #aaa; font-style: italic; }
+.nm { font-size: 11px; font-weight: 700; color: #222; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dt { font-size: 9.5px; color: #888; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.note { font-size: 9px; color: #aaa; font-style: italic; }
 
 .sibs { margin-top: 5px; padding-top: 4px; border-top: 1px solid rgba(0,0,0,.07); display: flex; flex-wrap: wrap; gap: 3px; }
 .sib { font-size: 10px; padding: 2px 7px; border-radius: 10px; border: 1px solid; cursor: pointer; white-space: nowrap; transition: filter .1s; background: white; }
@@ -266,6 +266,9 @@ const P = {
   hildac:    {n:"Hilda Carolina Gustafson", b:"1865",         s:"F",c:"sv", fi:"oskarfl",   mi:"annabn",
              desc:"Hilda Carolina Gustafson, född i Mjölby. Bekräftad i Riksarkivet folkräkning 1890. Gift med Carl August Linder. Trolig dotter till Oscar Fredrik Gustafsson Lindgren och Anna Brita Nilsdotter — baserat på pärmdokumentens ahnentafel, där brodern Oskar Fredrik Gustafsson (*1856) är Nr 2.",
              desc_de:"Hilda Carolina Gustafson, geboren in Mjölby. Bestätigt im Riksarkivet Volkszählung 1890. Verheiratet mit Carl August Linder. Wahrscheinliche Tochter von Oscar Fredrik Gustafsson Lindgren und Anna Brita Nilsdotter — basierend auf dem Ahnentafel-Dokument der Familie."},
+  oskarfg:   {n:"Oskar Fredrik Gustafsson", b:"1856",          s:"M",c:"sv", fi:"oskarfl",   mi:"annabn",
+             desc:"Oskar Fredrik Gustafsson, född 23.6.1856 i Mjölby. Trolig bror till Hilda Carolina Gustafson (*1865). Gift med Johanna Carolina Andersdotter (*14.3.1848 Vreta kloster). Källa: Linder-pärmens Nr 2 (foto: 02-nr02-03-oskar-johanna.heic).",
+             desc_de:"Oskar Fredrik Gustafsson, geb. 23.6.1856 in Mjölby. Wahrscheinlicher Bruder von Hilda Carolina Gustafson (*1865). Verheiratet mit Johanna Carolina Andersdotter (*1848). Quelle: Ahnentafel-Dokument, Nr. 2."},
   oskarfl:   {n:"Oscar Fr. Gustafsson Lindgren", b:"~1816",  s:"M",c:"sv", fi:null,        mi:null,
              desc:"Oscar Fredrik Gustafsson Lindgren, född ~1816. Trolig far till Hilda Carolina Gustafson (*1865) och Oskar Fredrik Gustafsson (*1856 Mjölby). Källa: handskrivet ahnentafel-diagram i Linder-pärmens Nr 4 (foto: 03-nr04-05-06.heic). Exakt födelseår okänt.",
              desc_de:"Oscar Fredrik Gustafsson Lindgren, geb. ~1816. Mutmaßlicher Vater von Hilda Carolina Gustafson (*1865) und Oskar Fredrik Gustafsson (*1856). Quelle: handgeschriebenes Ahnentafel-Diagramm im Linder-Ordner, Nr. 4."},
@@ -357,10 +360,10 @@ const P = {
 Object.keys(P).forEach(id => P[id].id = id);
 
 // ════ LAYOUT CONSTANTS ════
-const CARD_W  = 210;
-const COL_GAP = 44;
+const CARD_W  = 168;
+const COL_GAP = 14;
 const COL_W   = CARD_W + COL_GAP;
-const LEAF_H  = 70;   // px per leaf slot
+const LEAF_H  = 46;   // px per leaf slot
 const MAX_G   = 9;    // max generations (öka vid behov)
 
 // ════ HELPERS ════
@@ -562,8 +565,9 @@ function drawLines(ctx, slots, pos) {
 function render(rootId) {
   const slots  = buildSlots(rootId);
   const numG   = slots.length;
-  const leaves = Math.pow(2, numG - 1);
-  const totalH = leaves * LEAF_H;
+  // Use actual populated entries across all generations, not theoretical 2^n
+  const maxPop = Math.max(...slots.map(g => g.filter(id => id !== null).length));
+  const totalH = Math.max(maxPop * LEAF_H, 300);
   const totalW = numG * COL_W + 40;
   const PAD_X  = 20;
   const PAD_Y  = 60;
@@ -706,7 +710,7 @@ function render(rootId) {
 
   // Two-pass layout: measure actual card heights, fix overlaps, re-centre parents
   requestAnimationFrame(() => {
-    const GAP = 5;
+    const GAP = 2;
 
     // Pass 1→0: from deepest generation inward.
     // For each generation: recalculate y as midpoint of children (except deepest),
