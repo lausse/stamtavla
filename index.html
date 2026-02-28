@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stavla – Interaktiv stamtavla</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body { background: #eae6e0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+#topbar {
+  flex-shrink: 0; background: #fff; border-bottom: 1px solid #ddd;
+  padding: 10px 20px; display: flex; align-items: center; gap: 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.08);
+}
+#topbar h1 { font-size: 16px; font-weight: 700; color: #333; }
+#focus-name { font-size: 14px; color: #666; flex: 1; }
+#back { padding: 6px 14px; border-radius: 20px; border: 1.5px solid #ccc; background: white; font-size: 13px; cursor: pointer; color: #555; transition: background .1s; }
+#back:hover:not(:disabled) { background: #f0f0f0; }
+#back:disabled { opacity: .35; cursor: default; }
+.hint { font-size: 11px; color: #bbb; white-space: nowrap; }
+
+#viewport { flex: 1; overflow: auto; position: relative; touch-action: pan-x pan-y; }
+
+#wrap { position: relative; }
+
+canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
+
+/* ── Card ── */
+.card {
+  position: absolute; display: flex; align-items: flex-start; gap: 8px;
+  padding: 8px 12px 8px 8px; border-radius: 18px; border: 2.5px solid;
+  width: 210px; transform: translateY(-50%);
+  background: white; cursor: pointer;
+  transition: filter .12s, box-shadow .12s;
+}
+.card:hover { filter: brightness(.96); box-shadow: 0 3px 12px rgba(0,0,0,.14); z-index: 5; }
+.card.focused { box-shadow: 0 0 0 3px rgba(100,80,200,.35); z-index: 6; cursor: default; }
+
+.av { width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 16px; color: white; margin-top: 1px; }
+
+.info { flex: 1; min-width: 0; }
+.nm { font-size: 12.5px; font-weight: 700; color: #222; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dt { font-size: 10.5px; color: #888; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.note { font-size: 10px; color: #aaa; font-style: italic; }
+
+.sibs { margin-top: 5px; padding-top: 4px; border-top: 1px solid rgba(0,0,0,.07); display: flex; flex-wrap: wrap; gap: 3px; }
+.sib { font-size: 10px; padding: 2px 7px; border-radius: 10px; border: 1px solid; cursor: pointer; white-space: nowrap; transition: filter .1s; background: white; }
+.sib:hover { filter: brightness(.92); }
+
+/* Colour themes */
+.c-sv   { border-color: #5ab6e0; background: #eaf5fc; } .c-sv   .av { background: #5ab6e0; }
+.c-svb  { border-color: #52bb52; background: #eafaea; } .c-svb  .av { background: #52bb52; }
+.c-rs   { border-color: #e06060; background: #fbeaea; } .c-rs   .av { background: #e06060; }
+.c-de   { border-color: #d0b040; background: #fdf8e0; } .c-de   .av { background: #d0b040; }
+.c-mix  { border-color: #9060d0; background: #f4eefb; } .c-mix  .av { background: #9060d0; }
+.c-unk  { border-color: #bbb;    background: #f7f7f7; } .c-unk  .av { background: #bbb;    }
+.c-unk .nm { color: #999; font-style: italic; }
+
+/* Sibling chip colours */
+.sib-sv  { border-color: #5ab6e0; color: #2a7090; }
+.sib-svb { border-color: #52bb52; color: #2a6030; }
+.sib-rs  { border-color: #e06060; color: #903030; }
+.sib-de  { border-color: #d0b040; color: #705010; }
+.sib-mix { border-color: #9060d0; color: #503090; }
+.sib-unk { border-color: #bbb;    color: #888;    }
+.barn { margin-top: 4px; padding-top: 4px; border-top: 1px dashed rgba(0,0,0,.1);
+        display: flex; flex-wrap: wrap; gap: 3px; }
+.barn::before { font-size: 10px; font-weight: 700; color: #ccc; }
+body.lang-sv .barn::before { content: 'barn: '; }
+body.lang-de .barn::before { content: 'Kinder: '; }
+
+/* Language toggle */
+#lang-toggle { display: flex; gap: 3px; margin-left: 8px; }
+.lang-btn { font-size: 17px; background: none; border: 2px solid transparent;
+            border-radius: 6px; padding: 1px 4px; cursor: pointer;
+            opacity: .4; line-height: 1; transition: opacity .1s; }
+.lang-btn:hover { opacity: .75; }
+.lang-btn.active { border-color: #bbb; opacity: 1; }
+.child { font-size: 10px; padding: 2px 7px; border-radius: 10px; cursor: pointer;
+         white-space: nowrap; transition: filter .1s; border: none; }
+.child:hover { filter: brightness(.88); }
+.child-sv   { background: #cce8f5; color: #1a608a; }
+.child-svb  { background: #c8eec8; color: #1a5a1a; }
+.child-rs   { background: #f5cccc; color: #8a1a1a; }
+.child-de   { background: #f5e8a0; color: #6a4a00; }
+.child-mix  { background: #dcc8f5; color: #4a1a9a; }
+.child-unk  { background: #e0e0e0; color: #555; }
+
+
+/* Gen labels */
+.gen-lbl { position: absolute; top: 10px; font-size: 10px; font-weight: 700; letter-spacing: .5px; color: #bbb; text-transform: uppercase; white-space: nowrap; pointer-events: none; }
+
+/* ── Main layout ── */
+#main { flex: 1; display: flex; overflow: hidden; }
+
+/* ── Detail panel ── */
+#detail {
+  width: 272px; flex-shrink: 0;
+  background: #fafafa; border-left: 1px solid #ddd;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.det-head {
+  padding: 14px 16px; display: flex; align-items: center; gap: 12px;
+  border-bottom: 1px solid #eee; flex-shrink: 0;
+}
+.det-av {
+  width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; color: white;
+}
+.det-name { font-size: 13.5px; font-weight: 700; color: #222; line-height: 1.3; }
+.det-dates { font-size: 11.5px; color: #777; margin-top: 2px; }
+.det-body { flex: 1; overflow-y: auto; padding: 12px 14px; }
+.det-section { margin-bottom: 14px; }
+.det-section h4 {
+  font-size: 9.5px; font-weight: 700; letter-spacing: .6px;
+  text-transform: uppercase; color: #bbb; margin-bottom: 6px;
+}
+.det-links { display: flex; flex-wrap: wrap; gap: 4px; }
+.det-link {
+  font-size: 11.5px; padding: 3px 9px; border-radius: 10px;
+  border: 1px solid #ddd; background: white; cursor: pointer; color: #333;
+  transition: background .1s;
+}
+.det-link:hover { background: #efefef; }
+.det-text { font-size: 12px; color: #444; line-height: 1.6; }
+.det-note { font-size: 11px; color: #999; font-style: italic; margin-top: 5px; }
+.det-empty { font-size: 12px; color: #ccc; font-style: italic; padding: 20px 0; text-align: center; }
+</style>
+</head>
+<body class="lang-sv">
+
+<div id="topbar">
+  <h1>Stamtavla</h1>
+  <span id="focus-name"></span>
+  <button id="back" disabled>← Tillbaka</button>
+  <span class="hint">Klicka ett syskon för att centrera trädet på den personen</span>
+  <div id="lang-toggle">
+    <button class="lang-btn active" data-lang="sv">🇸🇪</button>
+    <button class="lang-btn"        data-lang="de">🇩🇪</button>
+  </div>
+</div>
+
+<div id="main">
+  <div id="viewport">
+    <div id="wrap">
+      <canvas id="cv"></canvas>
+    </div>
+  </div>
+  <div id="detail">
+    <div class="det-empty">Välj en person i trädet</div>
+  </div>
+</div>
+
+<script>
+// ════ TRANSLATIONS ════
+const LANG = {
+  sv: {
+    title:    'Stamtavla',
+    back:     '← Tillbaka',
+    hint:     'Klicka ett syskon för att centrera trädet på den personen',
+    genLabels:['Du / Fokus','Föräldrar','Mor-/farföräldrar','Gammelföräldrar','Ggammelföräldrar','Gggammelföräldrar'],
+    detParents:  'Föräldrar',
+    detSpouse:   'Make / Maka',
+    detChildren: 'Barn',
+    detSiblings: 'Syskon',
+    detNote:     'Anteckning',
+    detEmpty:    'Välj en person i trädet',
+  },
+  de: {
+    title:    'Stammbaum',
+    back:     '← Zurück',
+    hint:     'Klicke auf ein Geschwister, um den Baum auf diese Person zu zentrieren',
+    genLabels:['Du / Fokus','Eltern','Großeltern','Urgroßeltern','Ururgroßeltern','Urururgroßeltern'],
+    detParents:  'Eltern',
+    detSpouse:   'Ehepartner',
+    detChildren: 'Kinder',
+    detSiblings: 'Geschwister',
+    detNote:     'Notiz',
+    detEmpty:    'Wähle eine Person im Baum aus',
+  }
+};
+let lang = 'sv';
+
+// ════════════════════════════════════════════════════
+// PEOPLE DATA
+// fi = fatherId, mi = motherId
+// b = born, d = died, s = sex (M/F), c = color class
+// ════════════════════════════════════════════════════
+const P = {
+  lasse:     {n:"Lasse Nilsson",           b:"1975",          s:"M",c:"mix",fi:"leif",      mi:"marijana",
+             desc:"Lasse Nilsson, född i Älvsborg, Göteborg. Har rötter i tre länder: Sverige (Nilsson/Bergman från Mjölby och Lysekil), Serbien (Mitrovic/Blagojevic från Soko Banja) och Tyskland (Lammerding/Schräder från Borghorst).",
+             desc_de:"Lasse Nilsson, geboren in Älvsborg, Göteborg. Hat Wurzeln in drei Ländern: Schweden (Nilsson/Bergman aus Mjölby und Lysekil), Serbien (Mitrovic/Blagojevic aus Soko Banja) und Deutschland (Lammerding/Schräder aus Borghorst)."},
+  sanna:     {n:"Sanna Nilsson",           b:"1977",          s:"F",c:"mix",fi:"leif",      mi:"marijana"},
+  matti:     {n:"Matti Nilsson",           b:"1983",          s:"M",c:"mix",fi:"leif",      mi:"marijana"},
+  leif:      {n:"Leif Nilsson",            b:"1942",          s:"M",c:"sv", fi:"tage",      mi:"lilian"},
+  marijana:  {n:"Marijana Mitrovic",       b:"1946",          s:"F",c:"rs", fi:"ceda",      mi:"kathe"},
+  lillemor:  {n:"Lillemor Nilsson",        b:"1944",          s:"F",c:"sv", fi:"tage",      mi:"lilian"},
+  perolof:   {n:"Per-Olof Nilsson",        b:"1946",d:"1992", s:"M",c:"sv", fi:"tage",      mi:"lilian"},
+  elisabeth: {n:"Elisabeth Nilsson",       b:"1949",d:"2026", s:"F",c:"sv", fi:"tage",      mi:"lilian"},
+  tage:      {n:"Carl Tage Nilsson",       b:"1919",d:"1990", s:"M",c:"sv", fi:"kalle",     mi:"alma"},
+  lilian:    {n:"Lilian Bergman",          b:"1920",d:"2000", s:"F",c:"svb",fi:"olof",      mi:"elsa"},
+  ceda:      {n:"Cedomir Mitrovic",        b:"1912",d:"1981", s:"M",c:"rs", fi:"petar",     mi:"stanija",
+             desc:"Cedomir \"Ceda\" Mitrovic, uppvuxen i Soko Banja. Gick i militärskola och tjänstgjorde i Pirot (1937–40) och Niš. Angiven och arresterad i Niš juli 1942. Fängslad i Belgrad aug–okt 1942. Deporterades till KZ Mauthausen (okt 1942), sedan Auschwitz/Birkenau/Dora (april 1943–jan 1945), Nordhausen (jan–mars 1945) och Bergen-Belsen (mars–april 1945). Befriad av engelsmännen 15 april 1945. Träffade Käthe i DP-lägret Borghorst. Bosatte sig i Münster 1950, köpte hus i Zaječar till sin mor ~1962. Födelseår 1912 bekräftat via Arolsen Archives (4 primärkällor).",
+             desc_de:"Cedomir \"Ceda\" Mitrovic, aufgewachsen in Soko Banja. Besuchte eine Militärschule und diente in Pirot (1937–40) und Niš. Im Juli 1942 in Niš denunziert und verhaftet. Aug.–Okt. 1942 in Belgrad inhaftiert. Deportiert ins KZ Mauthausen (Okt. 1942), dann Auschwitz/Birkenau/Dora (April 1943–Jan. 1945), Nordhausen (Jan.–März 1945) und Bergen-Belsen (März–April 1945). Am 15. April 1945 von den Briten befreit. Lernte Käthe im DP-Lager Borghorst kennen. Ließ sich 1950 in Münster nieder, kaufte ~1962 ein Haus in Zaječar für seine Mutter. Geburtsjahr 1912 durch Arolsen Archives bestätigt (4 Primärquellen)."},
+  kathe:     {n:"Käthe Lammerding",        b:"1926",d:"2009", s:"F",c:"de", fi:"willibald", mi:"trudis",
+             desc:"Katharina Mathilde Josefine Lammerding, kallad Käthe. Född i Borghorst, dotter till Willibald och Gertrud (Trudis). Träffade Ceda Mitrovic i DP-lägret Borghorst efter kriget. Gifte sig och fick tre döttrar: Marijana, Vera och Jela.",
+             desc_de:"Katharina Mathilde Josefine Lammerding, genannt Käthe. Geboren in Borghorst, Tochter von Willibald und Gertrud (Trudis). Lernte Ceda Mitrovic im DP-Lager Borghorst nach dem Krieg kennen. Heiratete ihn und bekam drei Töchter: Marijana, Vera und Jela."},
+  annemarie: {n:"Anne-Marie Nilsson",      b:"1917",          s:"F",c:"sv", fi:"kalle",     mi:"alma"},
+  yngve:     {n:"Carl Yngve Nilsson",      b:"1924",d:"1973", s:"M",c:"sv", fi:"kalle",     mi:"alma"},
+  hulda:     {n:"Hulda Maria Carlsson",    b:"1908",          s:"F",c:"svb",fi:"olof",      mi:"elsa"},
+  torelof:   {n:"Tor Elof Carlsson",       b:"1910",          s:"M",c:"svb",fi:"olof",      mi:"elsa"},
+  gurlier:   {n:"Gurli Erika Carlsson",    b:"1910",          s:"F",c:"svb",fi:"olof",      mi:"elsa"},
+  karin:     {n:"Karin Solgund Carlsson",  b:"1923",          s:"F",c:"svb",fi:"olof",      mi:"elsa"},
+  mile:      {n:"Milorad Blagojevic",      b:"~1900",         s:"M",c:"rs", fi:null,        mi:"stanija"},
+  dimitri:   {n:"Dimitri (försvunnen)",    b:null,            s:"M",c:"rs", fi:null,        mi:"stanija"},
+  egid:      {n:"Egid Ä. Lammerding",      b:"1925",d:"1944", s:"M",c:"de", fi:"willibald", mi:"trudis",
+             desc:"Egid Ägidius Lammerding, Gefreiter i tyska armén. Försvann 13 mars 1944 vid fronten i Ukraina (Bjerdytschew/Dwinitza/Raum Winnitza) under reträtt, bara 18 år gammal. Enligt Lasses gammelmormor träffades han av ett skott i huvudet (Kopfschuß) — han dog troligen på plats men det bekräftades aldrig officiellt, därav status \\\"vermisst\\\" (saknad). Associerad krigskyrkogård: Kyjiw.",
+             desc_de:"Egid Ägidius Lammerding, Gefreiter. Am 13. März 1944 beim Rückzug an der Front in der Ukraine (Bjerdytschew/Dwinitza/Raum Winnitza) vermisst gemeldet, nur 18 Jahre alt. Laut mündlicher Überlieferung (Lasses Urgroßmutter) traf ihn ein Kopfschuss — er starb wahrscheinlich vor Ort, wurde aber nie offiziell bestätigt, daher Status \\\"vermisst\\\". Zugehöriger Kriegsfriedhof: Kyjiw.",
+             x:"Kopfschuß, reträtt – vermisst, ej bekräftat"},
+  franzl:    {n:"Franz Lammerding",        b:"1930",d:"2024", s:"M",c:"de", fi:"willibald", mi:"trudis"},
+  gertrudl:  {n:"Gertrud Lammerding",      b:"1935",d:"2019", s:"F",c:"de", fi:"willibald", mi:"trudis"},
+  vera:      {n:"Vera Mitrovic",           b:"1950",          s:"F",c:"rs", fi:"ceda",      mi:"kathe"},
+  jela:      {n:"Jela Mitrovic",           b:"1953",          s:"F",c:"rs", fi:"ceda",      mi:"kathe"},
+  marial:    {n:"Maria Lammerding",        b:"1939",d:"2018", s:"F",c:"de", fi:"willibald", mi:"trudis"},
+  kalle:     {n:"Carl August Nilsson",     b:"1884",d:"1973", s:"M",c:"sv", fi:null,        mi:null,  x:'"Kalle Bank"',
+             desc:"Carl August Nilsson, känd som \"Kalle Bank\". Möbelfabrikstapetserare i Mjölby, ägde möbelaffär på S:t Persgatan 5 med tre anställda. Affären brann ned (även grannaffären), orsaken är okänd. Efterlämnade tre barn: Anne-Marie, Tage och Yngve.",
+             desc_de:"Carl August Nilsson, bekannt als \"Kalle Bank\". Möbeltapezierer in Mjölby, besaß ein Möbelgeschäft in der S:t Persgatan 5 mit drei Angestellten. Das Geschäft brannte ab (auch das Nachbargeschäft), Ursache unbekannt. Hinterließ drei Kinder: Anne-Marie, Tage und Yngve."},
+  alma:      {n:"Alma Maria Linder",       b:"1888",d:"1932", s:"F",c:"sv", fi:null,        mi:null,
+             desc:"Alma Maria Linder, gift med Kalle Bank. Dog 1932 vid 43 års ålder i sjukdom — Yngve var bara 7 år gammal när hon gick bort. Begravd i Mjölby.",
+             desc_de:"Alma Maria Linder, verheiratet mit Kalle Bank. Starb 1932 im Alter von 43 Jahren an einer Krankheit — Yngve war erst 7 Jahre alt. In Mjölby begraben."},
+  olof:      {n:"Olof Hilmer Carlsson",    b:"1883",          s:"M",c:"svb",fi:null,        mi:null},
+  elsa:      {n:"Elsa Charlotta Bergman",  b:"1890",          s:"F",c:"svb",fi:"alfred",    mi:"amanda"},
+  petar:     {n:"Petar Mitrovic",          b:null, d:"~1917", s:"M",c:"unk",fi:null,        mi:null,  x:"†WWI"},
+  stanija:   {n:"Stanija Blagojevic",      b:"~1886",         s:"F",c:"rs", fi:"jovanovic", mi:null,
+             desc:"Stanija Blagojevic (f. Jovanovic), från Soko Banja. Hennes far ägde kvarn och gästhus nära staden. Fick tre söner med oklart om de hade samma far. Äldste sonen Milorad (Mile) bodde kvar i Zaječar; mellanbroder Dimitri försvann spårlöst vid bulgariska gränsen; yngste sonen Ceda överlevde Förintelsen. Stanija dog i Zaječar, år okänt.",
+             desc_de:"Stanija Blagojevic (geb. Jovanovic), aus Soko Banja. Ihr Vater besaß eine Mühle und ein Gasthaus in der Nähe der Stadt. Bekam drei Söhne, möglicherweise von verschiedenen Vätern. Ältester Sohn Milorad (Mile) blieb in Zaječar; Sohn Dimitri verschwand spurlos an der bulgarischen Grenze; jüngster Sohn Ceda überlebte den Holocaust. Stanija starb in Zaječar, Todesjahr unbekannt."},
+  willibald: {n:"Willibald Lammerding",    b:"1895",d:"1940", s:"M",c:"de", fi:"hermann",   mi:"paula",
+             desc:"Willibald Lammerding, son till skräddarmästaren Hermann. Födelseår 1895 bekräftat i dopbok St. Nikomedes, Borghorst (Matricula Online, nr 142) — döpt 14.7.1895, faddrar: Willibald Vorspohl och Sophia H. Jahreing. Dog 10 juni 1940 i Borghorst.",
+             desc_de:"Willibald Lammerding, Sohn des Schneidermeisters Hermann. Geburtsjahr 1895 bestätigt im Taufbuch St. Nikomedes, Borghorst (Matricula Online, Nr. 142) — getauft am 14.7.1895, Taufpaten: Willibald Vorspohl und Sophia H. Jahreing. Gestorben am 10. Juni 1940 in Borghorst."},
+  trudis:    {n:"Gertrud Schräder",        b:"1896",d:"1977", s:"F",c:"de", fi:"josefb",    mi:"mkcordes"},
+  toza:      {n:"Toza Blagojevic",         b:null,            s:"M",c:"rs", fi:"jovanovic", mi:null,  x:"Niš"},
+  dunja:     {n:"Dunja",                   b:null,            s:"F",c:"rs", fi:"jovanovic", mi:null,  x:"Belgrad"},
+  mathildes: {n:"Mathilde Schräder",       b:"1887",          s:"F",c:"de", fi:"josefb",    mi:"mkcordes"},
+  franzs:    {n:"Franz Schräder",          b:"1889",          s:"M",c:"de", fi:"josefb",    mi:"mkcordes"},
+  marias:    {n:"Maria Schräder",          b:"1894",          s:"F",c:"de", fi:"josefb",    mi:"mkcordes", x:"T4?"},
+  alfred:    {n:"Alfred Bergman",          b:"1863",          s:"M",c:"svb",fi:null,        mi:null,  x:"Lysekil"},
+  amanda:    {n:"Amanda Strömberg",        b:"1868",          s:"F",c:"svb",fi:null,        mi:null},
+  jovanovic: {n:"Jovanovic (far)",         b:"~1855",         s:"M",c:"rs", fi:null,        mi:null,  x:"Soko Banja"},
+  hermann:   {n:"Hermann Lammerding",      b:"1858",d:"1922", s:"M",c:"de", fi:"bernhard",  mi:"elisabethw"},
+  paula:     {n:"Paula Vorspohl",          b:"1862",d:"1929", s:"F",c:"de", fi:"heinrichv", mi:"anna_s"},
+  josefb:    {n:"Josef B. Schräder",       b:"1859",d:"1930", s:"M",c:"de", fi:"heinrichs", mi:"antonette"},
+  mkcordes:  {n:"Maria K. Cordes",         b:"1857",d:"1904", s:"F",c:"de", fi:"theodor",   mi:"mkteves"},
+  bernhard:  {n:"Bernhard Lammerding",     b:null,            s:"M",c:"de", fi:null,        mi:null},
+  elisabethw:{n:"Elisabeth Wewermann",     b:null,            s:"F",c:"de", fi:null,        mi:null},
+  heinrichv: {n:"Heinrich Vorpohl",        b:"1829",          s:"M",c:"de", fi:null,        mi:null},
+  anna_s:    {n:"Anna Spenneberg",         b:"1831",          s:"F",c:"de", fi:null,        mi:null},
+  heinrichs: {n:"Heinrich Schräder",       b:null,            s:"M",c:"de", fi:null,        mi:null},
+  antonette: {n:"Antonette Laumann",       b:null,            s:"F",c:"de", fi:null,        mi:null},
+  theodor:   {n:"Theodor Cordes",          b:null,            s:"M",c:"de", fi:null,        mi:null},
+
+  // Partners gen 0
+  jorg:     {n:"Jörg Teichgraeber",   b:"1972", s:"M", c:"mix", fi:null,      mi:null},
+  alaya:    {n:"Alaya",               b:"1986", s:"F", c:"mix", fi:null,      mi:null},
+  // Barnbarn (Sannas och Mattis barn)
+  malva:    {n:"Malva",               b:"2021", s:"F", c:"mix", fi:"jorg",    mi:"sanna"},
+  milo_t:   {n:"Milo",                b:"2025", s:"M", c:"mix", fi:"jorg",    mi:"sanna"},
+  alma_c:   {n:"Alma",                b:"2021", s:"F", c:"mix", fi:"matti",   mi:"alaya"},
+  vide:     {n:"Vide",                b:"2023", s:"M", c:"mix", fi:"matti",   mi:"alaya"},
+  // Veras barn
+  tom_h:    {n:"Tom Hartmann",        b:"1973", s:"M", c:"rs",  fi:null,      mi:"vera"},
+  jana_s:   {n:"Jana",                b:"1980", s:"F", c:"rs",  fi:null,      mi:"vera"},
+  // Jelas barn
+  julian_s: {n:"Julian Siegler",      b:"1982", s:"M", c:"rs",  fi:null,      mi:"jela"},
+  philipp_k:{n:"Philipp Kirchner",    b:"1988", s:"M", c:"rs",  fi:null,      mi:"jela"},
+  // Anne-Maries barn (Huskvarna)
+  hans_am:  {n:"Hans",                b:null,   s:"M", c:"sv",  fi:null,      mi:"annemarie"},
+  karin_am: {n:"Karin",               b:null,   s:"F", c:"sv",  fi:null,      mi:"annemarie"},
+  gunnar_am:{n:"Gunnar",              b:null,   s:"M", c:"sv",  fi:null,      mi:"annemarie"},
+  // Elisabeths döttrar
+  linda:    {n:"Linda Greider",       b:null,   s:"F", c:"sv",  fi:null,      mi:"elisabeth"},
+  liza:     {n:"Liza Nilsson",        b:null,   s:"F", c:"sv",  fi:null,      mi:"elisabeth"},
+  // Huldas barn
+  rustan:   {n:"Rustan Jonsson",      b:null,   s:"M", c:"svb", fi:null,      mi:"hulda"},
+  sverker:  {n:"Sverker Jonsson",     b:null,   s:"M", c:"svb", fi:null,      mi:"hulda"},
+  // Tor Elofs barn
+  ralf:     {n:"Ralf",                b:null,   s:"M", c:"svb", fi:"torelof", mi:null},
+  torleif:  {n:"Tor-Leif",            b:null,   s:"M", c:"svb", fi:"torelof", mi:null},
+  annalena: {n:"Anna-Lena",           b:null,   s:"F", c:"svb", fi:"torelof", mi:null},
+  // Karins son
+  magnus:   {n:"Magnus Linér",        b:null,   s:"M", c:"svb", fi:null,      mi:"karin"},
+  // Franz Lammerdings barn
+  ruth_l:   {n:"Ruth",                b:"1964", s:"F", c:"de",  fi:"franzl",  mi:null},
+  rolf_l:   {n:"Rolf",                b:"1965", s:"M", c:"de",  fi:"franzl",  mi:null},
+  ute_l:    {n:"Ute",                 b:"1966", s:"F", c:"de",  fi:"franzl",  mi:null},
+  elke_l:   {n:"Elke",                b:"1966", s:"F", c:"de",  fi:"franzl",  mi:null},
+  stefan_l: {n:"Stefan",              b:"1967", s:"M", c:"de",  fi:"franzl",  mi:null},
+  // Gertrud Lammerdings son
+  udo:      {n:"Udo Schubert",        b:"1963", s:"M", c:"de",  fi:null,      mi:"gertrudl"},
+  mkteves:   {n:"Maria K. Teves",          b:null,            s:"F",c:"de", fi:null,        mi:null},
+};
+Object.keys(P).forEach(id => P[id].id = id);
+
+// ════ LAYOUT CONSTANTS ════
+const CARD_W  = 210;
+const COL_GAP = 44;
+const COL_W   = CARD_W + COL_GAP;
+const LEAF_H  = 70;   // px per leaf slot
+const MAX_G   = 5;    // max generations
+
+// ════ HELPERS ════
+function getSibs(id) {
+  const p = P[id];
+  return Object.values(P).filter(o =>
+    o.id !== id &&
+    ((p.fi && o.fi === p.fi) || (p.mi && o.mi === p.mi))
+  );
+}
+
+function buildSlots(rootId) {
+  const slots = [[rootId]];
+  for (let g = 0; g < MAX_G - 1; g++) {
+    const next = [];
+    let any = false;
+    for (const id of slots[g]) {
+      const p = id ? P[id] : null;
+      const f = p ? p.fi || null : null;
+      const m = p ? p.mi || null : null;
+      next.push(f, m);
+      if (f || m) any = true;
+    }
+    if (!any) break;
+    slots.push(next);
+  }
+  return slots;
+}
+
+function dateStr(p) {
+  const parts = [];
+  if (p.b) parts.push('*' + p.b);
+  if (p.d) parts.push('†' + p.d);
+  return parts.join('  ');
+}
+
+const COLORS = {
+  sv:'#5ab6e0', svb:'#52bb52', rs:'#e06060', de:'#d0b040', mix:'#9060d0', unk:'#bbb'
+};
+
+function getChildren(id) {
+  return Object.values(P).filter(o => o.fi === id || o.mi === id);
+}
+
+function getSpouses(id) {
+  const children = getChildren(id);
+  const seen = new Set();
+  const result = [];
+  children.forEach(c => {
+    const other = (c.fi === id) ? c.mi : c.fi;
+    if (other && P[other] && !seen.has(other)) { seen.add(other); result.push(P[other]); }
+  });
+  return result;
+}
+
+// ════ DETAIL PANEL ════
+const detPanel = document.getElementById('detail');
+
+function renderDetail(id) {
+  if (!id || !P[id]) { detPanel.innerHTML = `<div class="det-empty">${LANG[lang].detEmpty}</div>`; return; }
+  const p   = P[id];
+  const col = COLORS[p.c] || '#bbb';
+
+  function linkBtn(person) {
+    return `<button class="det-link" onclick="focusPerson('${person.id}')">${person.s==='F'?'♀':'♂'} ${person.n}${person.b?' <small style="color:#aaa">*'+person.b+'</small>':''}</button>`;
+  }
+
+  let html = '';
+
+  // Header
+  html += `<div class="det-head" style="background:${col}18; border-left:4px solid ${col}">
+    <div class="det-av" style="background:${col}">${p.s==='F'?'♀':'♂'}</div>
+    <div>
+      <div class="det-name">${p.n}</div>
+      <div class="det-dates">${p.b?'*'+p.b:''}${p.b&&p.d?'&ensp;':''}${p.d?'†'+p.d:''}</div>
+    </div>
+  </div>`;
+
+  html += '<div class="det-body">';
+
+  // Description
+  const t = LANG[lang];
+  const descText = p['desc_' + lang] || p.desc;
+  if (descText) {
+    html += `<div class="det-section"><div class="det-text">${descText}</div></div>`;
+  }
+
+  // Parents
+  const father = p.fi ? P[p.fi] : null;
+  const mother = p.mi ? P[p.mi] : null;
+  if (father || mother) {
+    html += `<div class="det-section"><h4>${t.detParents}</h4><div class="det-links">`;
+    if (father) html += linkBtn(father);
+    if (mother) html += linkBtn(mother);
+    html += '</div></div>';
+  }
+
+  // Spouses
+  const spouses = getSpouses(id);
+  if (spouses.length > 0) {
+    html += `<div class="det-section"><h4>${t.detSpouse}</h4><div class="det-links">`;
+    spouses.forEach(sp => { html += linkBtn(sp); });
+    html += '</div></div>';
+  }
+
+  // Children
+  const children = getChildren(id);
+  if (children.length > 0) {
+    html += `<div class="det-section"><h4>${t.detChildren}</h4><div class="det-links">`;
+    children.forEach(c => { html += linkBtn(c); });
+    html += '</div></div>';
+  }
+
+  // Siblings
+  const sibs = getSibs(id);
+  if (sibs.length > 0) {
+    html += `<div class="det-section"><h4>${t.detSiblings}</h4><div class="det-links">`;
+    sibs.forEach(s => { html += linkBtn(s); });
+    html += '</div></div>';
+  }
+
+  // Short note (x field)
+  if (p.x && !descText) {
+    html += `<div class="det-section"><h4>${t.detNote}</h4><div class="det-note">${p.x}</div></div>`;
+  }
+
+  html += '</div>'; // det-body
+  detPanel.innerHTML = html;
+}
+
+// ════ STATE ════
+const hist = [];
+let currentRoot = 'lasse';
+
+// ════ DOM REFS ════
+const viewport  = document.getElementById('viewport');
+const wrap      = document.getElementById('wrap');
+const cv        = document.getElementById('cv');
+const backBtn   = document.getElementById('back');
+const focusName = document.getElementById('focus-name');
+
+// ════ FOCUS ════
+function focusPerson(id) {
+  if (!P[id] || id === currentRoot) return;
+  hist.push(currentRoot);
+  currentRoot = id;
+  const doRender = () => { render(id); renderDetail(id); };
+  if (document.startViewTransition) {
+    wrap.querySelectorAll('.card[data-id]').forEach(c => {
+      c.style.viewTransitionName = 'pers-' + c.dataset.id;
+    });
+    document.startViewTransition(doRender);
+  } else {
+    doRender();
+  }
+  backBtn.disabled = false;
+}
+
+backBtn.addEventListener('click', () => {
+  if (!hist.length) return;
+  const prev = hist.pop();
+  currentRoot = prev;
+  render(prev);
+  renderDetail(prev);
+  backBtn.disabled = hist.length === 0;
+});
+
+// ════ LINE DRAWING ════
+function drawLines(ctx, slots, pos) {
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+  slots.forEach((gen, g) => {
+    if (g === 0) return;
+    gen.forEach((parentId, i) => {
+      if (!parentId) return;
+      const childId = slots[g - 1][Math.floor(i / 2)];
+      if (!childId || !pos[childId] || !pos[parentId]) return;
+      const child  = pos[childId];
+      const parent = pos[parentId];
+      const midX = (child.x + CARD_W + parent.x) / 2;
+      ctx.strokeStyle = COLORS[P[parentId].c] || '#aaa';
+      ctx.beginPath();
+      ctx.moveTo(child.x + CARD_W, child.y);
+      ctx.lineTo(midX, child.y);
+      ctx.lineTo(midX, parent.y);
+      ctx.lineTo(parent.x, parent.y);
+      ctx.stroke();
+    });
+  });
+}
+
+// ════ RENDER ════
+function render(rootId) {
+  const slots  = buildSlots(rootId);
+  const numG   = slots.length;
+  const leaves = Math.pow(2, numG - 1);
+  const totalH = leaves * LEAF_H;
+  const totalW = numG * COL_W + 40;
+  const PAD_X  = 20;
+  const PAD_Y  = 60;
+
+  // Resize canvas and wrap
+  const canvasH = totalH + PAD_Y * 2;
+  wrap.style.width  = totalW + 'px';
+  wrap.style.height = canvasH + 'px';
+  cv.width  = totalW;
+  cv.height = canvasH;
+
+  // Clear old cards (keep canvas)
+  wrap.querySelectorAll('.card, .gen-lbl').forEach(el => el.remove());
+
+  // Compute positions
+  const pos = {};
+  slots.forEach((gen, g) => {
+    const numSlots = gen.length;
+    const slotH = totalH / numSlots;
+    gen.forEach((id, i) => {
+      if (!id) return;
+      pos[id] = {
+        x: PAD_X + g * COL_W,
+        y: PAD_Y + (i + 0.5) * slotH,
+      };
+    });
+  });
+
+  // Gen labels
+  const GEN_LABELS = LANG[lang].genLabels;
+  slots.forEach((gen, g) => {
+    const lbl = document.createElement('div');
+    lbl.className = 'gen-lbl';
+    lbl.textContent = GEN_LABELS[g] || `Gen ${g}`;
+    lbl.style.left = (PAD_X + g * COL_W) + 'px';
+    wrap.appendChild(lbl);
+  });
+
+  // Render cards
+  slots.forEach((gen, g) => {
+    gen.forEach((id) => {
+      if (!id) return;
+      const p   = P[id];
+      const pos_p = pos[id];
+      const sibs = getSibs(id);
+      const isFocus = (id === rootId);
+
+      const card = document.createElement('div');
+      card.className = 'card c-' + p.c + (isFocus ? ' focused' : '');
+      card.dataset.id = id;
+      card.style.left = pos_p.x + 'px';
+      card.style.top  = pos_p.y + 'px';
+
+      // Avatar
+      const av = document.createElement('div');
+      av.className = 'av';
+      av.textContent = p.s === 'F' ? '♀' : '♂';
+      card.appendChild(av);
+
+      // Info block
+      const info = document.createElement('div');
+      info.className = 'info';
+
+      const nm = document.createElement('div');
+      nm.className = 'nm';
+      nm.textContent = p.n;
+      info.appendChild(nm);
+
+      const dt = document.createElement('div');
+      dt.className = 'dt';
+      dt.textContent = dateStr(p);
+      if (p.x) {
+        const nt = document.createElement('span');
+        nt.className = 'note';
+        nt.textContent = ' · ' + p.x;
+        dt.appendChild(nt);
+      }
+      info.appendChild(dt);
+
+      // Sibling chips
+      if (sibs.length > 0) {
+        const sibsDiv = document.createElement('div');
+        sibsDiv.className = 'sibs';
+        sibs.forEach(s => {
+          const btn = document.createElement('button');
+          btn.className = 'sib sib-' + s.c;
+          const shortName = s.n.split(' ')[0];
+          const yr = s.b ? s.b.replace('~','').replace('ca ','') : '';
+          btn.textContent = shortName + (yr ? ' ' + yr : '') + (s.d ? ' †' : '');
+          btn.title = s.n + (s.b ? ' *'+s.b : '') + (s.d ? ' †'+s.d : '');
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            focusPerson(s.id);
+          });
+          sibsDiv.appendChild(btn);
+        });
+        info.appendChild(sibsDiv);
+      }
+
+      // Children chips
+      const children = getChildren(id);
+      if (children.length > 0) {
+        const barnDiv = document.createElement('div');
+        barnDiv.className = 'barn';
+        children.forEach(c => {
+          const btn = document.createElement('button');
+          btn.className = 'child child-' + c.c;
+          const firstName = c.n.split(' ')[0];
+          const yr = c.b ? ' ' + c.b.replace('~','').replace('ca ','').substring(0,4) : '';
+          btn.textContent = firstName + yr + (c.d ? ' †' : '');
+          btn.title = c.n + (c.b ? ' *'+c.b : '') + (c.d ? ' †'+c.d : '');
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            focusPerson(c.id);
+          });
+          barnDiv.appendChild(btn);
+        });
+        info.appendChild(barnDiv);
+      }
+
+      card.appendChild(info);
+
+      // Click on card itself = focus (unless already focused)
+      if (!isFocus) {
+        card.addEventListener('click', () => focusPerson(id));
+      }
+
+      wrap.appendChild(card);
+    });
+  });
+
+  // Initial line draw
+  const ctx = cv.getContext('2d');
+  drawLines(ctx, slots, pos);
+
+  // Two-pass layout: measure actual card heights, fix overlaps, re-centre parents
+  requestAnimationFrame(() => {
+    const GAP = 5;
+
+    // Pass 1→0: from deepest generation inward.
+    // For each generation: recalculate y as midpoint of children (except deepest),
+    // then push cards down to eliminate overlaps.
+    for (let g = slots.length - 1; g >= 0; g--) {
+      // Reposition to midpoint of children (skip deepest level)
+      if (g < slots.length - 1) {
+        slots[g].forEach((id, i) => {
+          if (!id) return;
+          const fId = slots[g + 1][i * 2];
+          const mId = slots[g + 1][i * 2 + 1];
+          const fY = (fId && pos[fId]) ? pos[fId].y : null;
+          const mY = (mId && pos[mId]) ? pos[mId].y : null;
+          if      (fY !== null && mY !== null) pos[id].y = (fY + mY) / 2;
+          else if (fY !== null)                pos[id].y = fY;
+          else if (mY !== null)                pos[id].y = mY;
+        });
+      }
+      // Fix overlaps top→bottom within this column
+      let prevBot = -Infinity;
+      for (const id of slots[g]) {
+        if (!id || !pos[id]) continue;
+        const card = wrap.querySelector(`.card[data-id="${id}"]`);
+        if (!card) continue;
+        const h = card.offsetHeight;
+        const minY = prevBot + GAP + h / 2;
+        if (pos[id].y < minY) pos[id].y = minY;
+        card.style.top = pos[id].y + 'px';
+        prevBot = pos[id].y + h / 2;
+      }
+    }
+
+    // Expand canvas/wrap if cards were pushed below the original bounds
+    let maxBot = 0;
+    wrap.querySelectorAll('.card').forEach(c => {
+      const b = parseFloat(c.style.top) + c.offsetHeight / 2;
+      if (b > maxBot) maxBot = b;
+    });
+    const needed = maxBot + PAD_Y;
+    if (needed > cv.height) {
+      cv.height = needed;
+      wrap.style.height = needed + 'px';
+    }
+
+    // Redraw lines with corrected positions
+    drawLines(ctx, slots, pos);
+  });
+
+  // Update header
+  focusName.textContent = P[rootId] ? P[rootId].n : '';
+}
+
+// ════ LANGUAGE ════
+function setLang(l) {
+  lang = l;
+  document.body.className = 'lang-' + l;
+  document.querySelectorAll('.lang-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.lang === l)
+  );
+  document.querySelector('#topbar h1').textContent = LANG[l].title;
+  document.getElementById('back').textContent = LANG[l].back;
+  document.querySelector('.hint').textContent = LANG[l].hint;
+  render(currentRoot);
+  renderDetail(currentRoot);
+}
+document.querySelectorAll('.lang-btn').forEach(btn =>
+  btn.addEventListener('click', () => setLang(btn.dataset.lang))
+);
+
+// ════ INIT ════
+render(currentRoot);
+renderDetail(currentRoot);
+</script>
+</body>
+</html>
