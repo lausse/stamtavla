@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Stavla – Interaktiv stamtavla</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -153,6 +154,85 @@ body.lang-de .barn::before { content: 'Kinder: '; }
 .det-text { font-size: 12px; color: #444; line-height: 1.6; }
 .det-note { font-size: 11px; color: #999; font-style: italic; margin-top: 5px; }
 .det-empty { font-size: 12px; color: #ccc; font-style: italic; padding: 20px 0; text-align: center; }
+
+/* ── Auth-zon i topbaren ── */
+#auth-zone { display:flex; align-items:center; gap:8px; }
+#auth-open-btn {
+  padding: 5px 13px; border-radius: 20px;
+  border: 1.5px solid #5ab6e0; background: white;
+  font-size: 12px; cursor: pointer; color: #3a80a0;
+  transition: background .1s; white-space: nowrap;
+}
+#auth-open-btn:hover { background: #eaf5fc; }
+#user-chip {
+  display: none; align-items: center; gap: 7px;
+  padding: 3px 10px 3px 4px; border-radius: 20px;
+  border: 1.5px solid #ddd; background: white; font-size: 12px; color: #444;
+}
+#user-pic { width: 22px; height: 22px; border-radius: 50%; }
+#sign-out-btn { background:none; border:none; font-size:11px; color:#ccc; cursor:pointer; padding:0 0 0 4px; }
+#sign-out-btn:hover { color: #e06060; }
+
+/* ── Fotopunkt på kort ── */
+.photo-dot {
+  position: absolute; top: 5px; right: 6px;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #4a90d9; box-shadow: 0 0 0 1.5px white;
+  pointer-events: none;
+}
+
+/* ── Ansökningsmodal ── */
+#apply-modal {
+  position: fixed; inset: 0; background: rgba(0,0,0,.5);
+  z-index: 100; display: none; align-items: center; justify-content: center;
+}
+#apply-box {
+  background: white; border-radius: 18px; padding: 28px 28px 22px;
+  max-width: 420px; width: 92%; box-shadow: 0 8px 40px rgba(0,0,0,.22);
+}
+#apply-box h2 { font-size: 16px; margin-bottom: 8px; color: #222; }
+#apply-box p  { font-size: 12.5px; color: #666; margin-bottom: 18px; line-height: 1.55; }
+.apply-field { margin-bottom: 13px; }
+.apply-field label { display:block; font-size:10px; font-weight:700; color:#aaa; margin-bottom:4px; text-transform:uppercase; letter-spacing:.5px; }
+.apply-field input, .apply-field textarea {
+  width: 100%; border: 1.5px solid #ddd; border-radius: 10px;
+  padding: 8px 11px; font-size: 13px; font-family: inherit; outline: none;
+  transition: border-color .15s; box-sizing: border-box;
+}
+.apply-field input:focus, .apply-field textarea:focus { border-color: #5ab6e0; }
+.apply-field textarea { resize: vertical; min-height: 72px; }
+#apply-submit {
+  width: 100%; padding: 10px; border-radius: 12px; border: none;
+  background: #5ab6e0; color: white; font-size: 14px; font-weight: 700;
+  cursor: pointer; transition: background .1s; margin-top: 4px;
+}
+#apply-submit:hover { background: #3a96c0; }
+#apply-submit:disabled { background: #bbb; cursor: default; }
+#apply-cancel, #apply-cancel2, #apply-cancel3 {
+  font-size: 12px; color: #bbb; background:none; border:none; cursor:pointer;
+  margin-top: 10px; display: block; width: 100%; text-align: center;
+}
+#apply-cancel:hover, #apply-cancel2:hover, #apply-cancel3:hover { color: #888; }
+#apply-status { font-size: 12.5px; margin-top: 8px; text-align: center; min-height: 18px; }
+#gsi-btn-container { display: flex; justify-content: center; margin-top: 12px; }
+.apply-success-icon { font-size: 36px; text-align:center; margin: 10px 0; }
+
+/* ── Foton i detaljpanelen ── */
+.det-photos { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px; }
+.det-photo {
+  width: 100%; aspect-ratio: 1; object-fit: cover;
+  border-radius: 8px; cursor: zoom-in;
+  transition: opacity .12s, transform .12s;
+}
+.det-photo:hover { opacity: .88; transform: scale(1.02); }
+
+/* ── Lightbox ── */
+#lightbox {
+  position: fixed; inset: 0; background: rgba(0,0,0,.92);
+  z-index: 200; display: none; align-items: center; justify-content: center;
+  cursor: zoom-out;
+}
+#lightbox img { max-width: 92vw; max-height: 88vh; border-radius: 10px; object-fit: contain; }
 </style>
 </head>
 <body class="lang-sv">
@@ -165,6 +245,14 @@ body.lang-de .barn::before { content: 'Kinder: '; }
   <div id="lang-toggle">
     <button class="lang-btn active" data-lang="sv">🇸🇪</button>
     <button class="lang-btn"        data-lang="de">🇩🇪</button>
+  </div>
+  <div id="auth-zone">
+    <button id="auth-open-btn" onclick="openApplyModal()">📷 Bildarkiv</button>
+    <div id="user-chip">
+      <img id="user-pic" src="" alt="">
+      <span id="user-name"></span>
+      <button id="sign-out-btn" onclick="signOut()" title="Logga ut">✕</button>
+    </div>
   </div>
 </div>
 
@@ -179,6 +267,58 @@ body.lang-de .barn::before { content: 'Kinder: '; }
   <div id="detail">
     <div class="det-empty">Välj en person i trädet</div>
   </div>
+</div>
+
+<!-- ── Ansökningsmodal ── -->
+<div id="apply-modal">
+  <div id="apply-box">
+
+    <!-- Vy 1: Ansökningsformulär -->
+    <div id="apply-view-request">
+      <h2>📷 Bildarkivet</h2>
+      <p>Stamtavlan är öppen för alla — men familjebilderna är reserverade för släktmedlemmar.
+         Fyll i formuläret nedan så hör Lasse av sig inom några dagar.</p>
+      <div class="apply-field">
+        <label>Ditt namn</label>
+        <input id="apply-name" type="text" placeholder="Förnamn Efternamn" autocomplete="name">
+      </div>
+      <div class="apply-field">
+        <label>Din Gmail-adress (används för inloggning)</label>
+        <input id="apply-email" type="email" placeholder="du@gmail.com" autocomplete="email">
+      </div>
+      <div class="apply-field">
+        <label>Hur ingår du i släkten?</label>
+        <textarea id="apply-relation" placeholder="T.ex. jag är dotter till Lillemor Nilsson, alltså ditt syskonbarn…"></textarea>
+      </div>
+      <button id="apply-submit" onclick="submitApplication()">Skicka ansökan</button>
+      <div id="apply-status"></div>
+      <button id="apply-cancel" onclick="closeApplyModal()">Avbryt</button>
+    </div>
+
+    <!-- Vy 2: Logga in med Google (för godkända) -->
+    <div id="apply-view-signin" style="display:none">
+      <h2>📷 Bildarkivet</h2>
+      <p>Du är godkänd! Logga in med ditt Google-konto för att se familjebilderna.</p>
+      <div id="gsi-btn-container"></div>
+      <button id="apply-cancel2" onclick="closeApplyModal()">Avbryt</button>
+    </div>
+
+    <!-- Vy 3: Ansökan skickad -->
+    <div id="apply-view-pending" style="display:none">
+      <div class="apply-success-icon">🎉</div>
+      <h2 style="text-align:center">Ansökan skickad!</h2>
+      <p style="text-align:center">Lasse får ett mail med din ansökan och godkänner via sin mobil.
+         Du får ett välkomstmail till din Gmail-adress när du är godkänd.<br><br>
+         <small id="apply-pending-note" style="color:#bbb"></small></p>
+      <button id="apply-cancel3" onclick="closeApplyModal()">Stäng</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Lightbox ── -->
+<div id="lightbox" onclick="this.style.display='none'">
+  <img id="lightbox-img" src="" alt="">
 </div>
 
 <div id="zoom-controls">
@@ -263,27 +403,33 @@ const P = {
   augustl:   {n:"Carl August Linder",      b:"1863",          s:"M",c:"sv", fi:null,        mi:null,
              desc:"Carl August Linder, kvarnarbetare i Mjölby. Bekräftad i Riksarkivet folkräkning 1890 (Westra Eldslösa Rusthåll, Mjölby). Far till Alma Maria och Carl Thure Linder. Gift med Hilda Carolina Gustafson.",
              desc_de:"Carl August Linder, Mühlenarbeiter in Mjölby. Bestätigt im Riksarkivet Volkszählung 1890. Vater von Alma Maria und Carl Thure Linder. Verheiratet mit Hilda Carolina Gustafson."},
-  hildac:    {n:"Hilda Carolina Gustafson", b:"1865",         s:"F",c:"sv", fi:"oskarfl",   mi:"annabn",
-             desc:"Hilda Carolina Gustafson, född i Mjölby. Bekräftad i Riksarkivet folkräkning 1890. Gift med Carl August Linder. Trolig dotter till Oscar Fredrik Gustafsson Lindgren och Anna Brita Nilsdotter — baserat på pärmdokumentens ahnentafel, där brodern Oskar Fredrik Gustafsson (*1856) är Nr 2.",
-             desc_de:"Hilda Carolina Gustafson, geboren in Mjölby. Bestätigt im Riksarkivet Volkszählung 1890. Verheiratet mit Carl August Linder. Wahrscheinliche Tochter von Oscar Fredrik Gustafsson Lindgren und Anna Brita Nilsdotter — basierend auf dem Ahnentafel-Dokument der Familie."},
-  oskarfg:   {n:"Oskar Fredrik Gustafsson", b:"1856",          s:"M",c:"sv", fi:"oskarfl",   mi:"annabn",
-             desc:"Oskar Fredrik Gustafsson, född 23.6.1856 i Mjölby. Trolig bror till Hilda Carolina Gustafson (*1865). Gift med Johanna Carolina Andersdotter (*14.3.1848 Vreta kloster). Källa: Linder-pärmens Nr 2 (foto: 02-nr02-03-oskar-johanna.heic).",
-             desc_de:"Oskar Fredrik Gustafsson, geb. 23.6.1856 in Mjölby. Wahrscheinlicher Bruder von Hilda Carolina Gustafson (*1865). Verheiratet mit Johanna Carolina Andersdotter (*1848). Quelle: Ahnentafel-Dokument, Nr. 2."},
-  oskarfl:   {n:"Oscar Fr. Gustafsson Lindgren", b:"~1816",  s:"M",c:"sv", fi:null,        mi:null,
-             desc:"Oscar Fredrik Gustafsson Lindgren, född ~1816. Trolig far till Hilda Carolina Gustafson (*1865) och Oskar Fredrik Gustafsson (*1856 Mjölby). Källa: handskrivet ahnentafel-diagram i Linder-pärmens Nr 4 (foto: 03-nr04-05-06.heic). Exakt födelseår okänt.",
-             desc_de:"Oscar Fredrik Gustafsson Lindgren, geb. ~1816. Mutmaßlicher Vater von Hilda Carolina Gustafson (*1865) und Oskar Fredrik Gustafsson (*1856). Quelle: handgeschriebenes Ahnentafel-Diagramm im Linder-Ordner, Nr. 4."},
-  annabn:    {n:"Anna Brita Nilsdotter",    b:"1814",         s:"F",c:"sv", fi:null,        mi:"evita",
-             desc:"Anna Brita Nilsdotter, född 21.9.1814. Trolig mor till Hilda Carolina Gustafson (*1865) och Oskar Fredrik Gustafsson (*1856). Källa: handskrivet ahnentafel-diagram i Linder-pärmens Nr 5 (foto: 03-nr04-05-06.heic). Mor: Evita Helena Larsdotter (*1775).",
-             desc_de:"Anna Brita Nilsdotter, geb. 21.9.1814. Mutmaßliche Mutter von Hilda Carolina Gustafson (*1865) und Oskar Fredrik Gustafsson (*1856). Quelle: Ahnentafel-Dokument, Nr. 5. Mutter: Evita Helena Larsdotter (*1775)."},
-  evita:     {n:"Evita Helena Larsdotter",  b:"1775",         s:"F",c:"sv", fi:"larsmag",   mi:"catharinasv",
-             desc:"Evita Helena Larsdotter, född 6.11.1775. Mor till Anna Brita Nilsdotter (*1814). Källa: Linder-pärmens Nr 11 (foto: 05-nr11-13.heic). Föräldrar: Lars Magnusson (*1747 Åbo) och Catharina Svensdotter (*1762).",
-             desc_de:"Evita Helena Larsdotter, geb. 6.11.1775. Mutter von Anna Brita Nilsdotter (*1814). Eltern: Lars Magnusson (*1747 Åbo) und Catharina Svensdotter (*1762). Quelle: Ahnentafel-Dokument, Nr. 11."},
+  hildac:    {n:"Hilda Carolina Gustafson", b:"1865",         s:"F",c:"sv", fi:"gustafh",   mi:"annabn",
+             desc:"Hilda Carolina Gustafson, född i Mjölby. Bekräftad i Riksarkivet folkräkning 1890. Gift med Carl August Linder. ⚠️ Trolig dotter till Gustaf Hindrik Gustafsson (*1816) och Anna Brita Nilsdotter — men Gustaf Hindrik dog 22.4.1863, dvs. två år innan Hildas uppgivna födelseår 1865. Möjlig förklaring: Anna Britas dotter med okänd far, som tog Gustafson-namnet, eller felaktigt födelseår i 1890 års census.",
+             desc_de:"Hilda Carolina Gustafson, geboren in Mjölby. Bestätigt in der Volkszählung 1890. Verheiratet mit Carl August Linder. ⚠️ Wahrscheinlich Tochter von Gustaf Hindrik Gustafsson (*1816) und Anna Brita Nilsdotter — aber Gustaf Hindrik starb 1863, zwei Jahre vor Hildas Geburt 1865."},
+  oskarfg:   {n:"Oskar Fredrik Gustafsson", b:"1856",          s:"M",c:"sv", fi:"gustafh",   mi:"annabn",
+             desc:"Oskar Fredrik Gustafsson Lindgren, född 23.6.1856 i Mjölby. Bror till Hilda Carolina Gustafson (*1865). Gift med Johanna Carolina Andersdotter (*14.3.1849 Vreta kloster). Baptister — barnen odöpta. Flyttade till Kristinehamn 2.7.1893. Källa: Linder-pärmens Nr 2 ✅ bildbevisat (02-nr02-03-oskar-johanna.heic).",
+             desc_de:"Oskar Fredrik Gustafsson Lindgren, geb. 23.6.1856 in Mjölby. Bruder von Hilda Carolina Gustafson (*1865). Verheiratet mit Johanna Carolina Andersdotter (*1849). Baptisten. Zog 1893 nach Kristinehamn. Quelle: Nr. 2 im Linder-Ordner ✅."},
+  gustafh:   {n:"Gustaf Hindrik Gustafsson", b:"14.8.1816",   s:"M",c:"sv", fi:null,        mi:"mariaad",
+             desc:"Gustaf Hindrik Gustafsson, född 14.8.1816 i Casabög/Ödeshög. Oäkta son till pigan Maria (Margareta) Adamsdotter — faderns namn okänt. Kvarnbyggnästare/mjölnare. Gift 11.7.1839 med Anna Brita Nilsdotter i Mjölby. Dog 22.4.1863 i Mjölby av lungsot (tbc). Barn: Frans Gustaf *1841, Johan Adolf *1843, Clara *1846, Anna Mathilda *1848, Johanna *1852, Oskar Fredrik *1856, Otto *1859. Källa: Linder-pärmens Nr 4 ✅ bildbevisat (03-nr04-05-06.heic).",
+             desc_de:"Gustaf Hindrik Gustafsson, geb. 14.8.1816 in Casabög/Ödeshög. Unehelicher Sohn von Maria Adamsdotter — Vater unbekannt. Mühlenmeister. Heirat 11.7.1839 mit Anna Brita Nilsdotter. Gest. 22.4.1863 an Tuberkulose. Quelle: Nr. 4 im Linder-Ordner ✅."},
+  mariaad:   {n:"Maria Adamsdotter",        b:"12.8.1793",    s:"F",c:"sv", fi:null,        mi:null,
+             desc:"Maria (Margareta) Adamsdotter, född 12.8.1793 i Ödeshög. Dotter till mjölnaren Adam Svensson (Nr 16) och Cajsa Johansdotter (Nr 17) på Örrmäs. Piga — fick oäkta sonen Gustaf Hindrik Gustafsson *1816. Anges som 'klen' i 1843 års längd, skickades till fattighuset. Dödsnotis ej påträffad. Källa: Linder-pärmens Nr 8/9 (04-nr07-10.heic).",
+             desc_de:"Maria (Margareta) Adamsdotter, geb. 12.8.1793 in Ödeshög. Tochter von Adam Svensson und Cajsa Johansdotter. Magd — unehelicher Sohn Gustaf Hindrik *1816. Quelle: Nr. 8 im Linder-Ordner."},
+  annabn:    {n:"Anna Brita Nilsdotter",    b:"21.9.1814",    s:"F",c:"sv", fi:"nilsmans",  mi:"britahel",
+             desc:"Anna Brita Nilsdotter, född 21.9.1814 i Åsbo. Dotter till torparen Nils Månsson (*1774 Åsbo) och Brita Helena Larsdotter (*1779). Gift 11.7.1839 med Gustaf Hindrik Gustafsson. Dog 1.5.1876 i Mjölby. Kallas 'Lindgren' i 1869–1874 års längder. Källa: Linder-pärmens Nr 5 ✅ bildbevisat (03-nr04-05-06.heic).",
+             desc_de:"Anna Brita Nilsdotter, geb. 21.9.1814 in Åsbo. Tochter von Nils Månsson (*1774) und Brita Helena Larsdotter (*1779). Heirat 1839 mit Gustaf Hindrik Gustafsson. Gest. 1.5.1876. Quelle: Nr. 5 im Linder-Ordner ✅."},
+  nilsmans:  {n:"Nils Månsson",             b:"17.8.1774",    s:"M",c:"sv", fi:null,        mi:null,
+             desc:"Nils Månsson, född 17.8.1774 i Åsbo. Torpare på Kruttorpet. Föräldrar: Måns Svensson (Nr 20) och Maria Olofsdotter (Nr 21). Gift 14.5.1802 i Åsbo med Brita Lena Larsdotter från Norra Kvisselhutt. Barn: Lena Kajsa *1803, Maja Lisa *1806, Sven *1810, Anna Brita *1814. Källa: Linder-pärmens Nr 10 ✅ bildbevisat (04-nr07-10.heic).",
+             desc_de:"Nils Månsson, geb. 17.8.1774 in Åsbo. Torpare. Heirat 1802 mit Brita Lena Larsdotter. Vater von Anna Brita Nilsdotter (*1814). Quelle: Nr. 10 im Linder-Ordner ✅."},
+  britahel:  {n:"Brita Helena Larsdotter",  b:"6.11.1779",    s:"F",c:"sv", fi:"larsmag",   mi:"catharinasv",
+             desc:"Brita Helena Larsdotter, född 6.11.1779 i Åsbo. Döpt 'Brita Helena' men kallad 'Brita Lena'. Dotter till hemmansbrukaren Lars Månsson (Nr 22) och Catharina Svensdotter (Nr 23), Norra Krisshult. Gift 14.6.1802 med Nils Månsson. Dog 27.10.1841 i Mjölby. Källa: Linder-pärmens Nr 11 ✅ bildbevisat (05-nr11-13.heic). ⚠️ Tidigare felaktigt angiven som 'Evita Helena Larsdotter *1775' — rättat 2026-03-01.",
+             desc_de:"Brita Helena Larsdotter, geb. 6.11.1779 in Åsbo. Genannt 'Brita Lena'. Tochter von Lars Månsson und Catharina Svensdotter. Gest. 27.10.1841. ✅ Bildbewiesen. Quelle: Nr. 11 im Linder-Ordner."},
   larsmag:   {n:"Lars Magnusson",           b:"1747",         s:"M",c:"sv", fi:null,        mi:null,
-             desc:"Lars Magnusson, född 25.9.1747 i Åbo (Finland). Far till Evita Helena Larsdotter (*1775). Källa: Linder-pärmens Nr 22 (foto: 07-nr19-22.heic).",
-             desc_de:"Lars Magnusson, geb. 25.9.1747 in Åbo (Finnland). Vater von Evita Helena Larsdotter (*1775). Quelle: Ahnentafel-Dokument, Nr. 22."},
+             desc:"Lars Månsson/Magnusson, född 25.9.1747 i Åsbo. Far till Brita Helena Larsdotter (*6.11.1779). Källa: Linder-pärmens Nr 22 (07-nr19-22.heic).",
+             desc_de:"Lars Månsson/Magnusson, geb. 25.9.1747 in Åsbo. Vater von Brita Helena Larsdotter (*1779). Quelle: Ahnentafel-Dokument, Nr. 22."},
   catharinasv:{n:"Catharina Svensdotter",   b:"1762",         s:"F",c:"sv", fi:null,        mi:null,
-             desc:"Catharina Svensdotter, född 13.3.1762. Mor till Evita Helena Larsdotter (*1775). Källa: Linder-pärmens Nr 23 (foto: 08-nr22-26.heic).",
-             desc_de:"Catharina Svensdotter, geb. 13.3.1762. Mutter von Evita Helena Larsdotter (*1775). Quelle: Ahnentafel-Dokument, Nr. 23."},
+             desc:"Catharina Svensdotter, född 13.3.1762. Mor till Brita Helena Larsdotter (*1779). Källa: Linder-pärmens Nr 23 (08-nr22-26.heic).",
+             desc_de:"Catharina Svensdotter, geb. 13.3.1762. Mutter von Brita Helena Larsdotter (*1779). Quelle: Ahnentafel-Dokument, Nr. 23."},
   alma:      {n:"Alma Maria Linder",       b:"1888",d:"1932", s:"F",c:"sv", fi:"augustl",   mi:"hildac",
              desc:"Alma Maria Linder, gift med Kalle Bank. Dog 1932 vid 43 års ålder i sjukdom — Yngve var bara 7 år gammal när hon gick bort. Begravd i Mjölby. Föräldrar: Carl August Linder (kvarnarbetare) och Hilda Carolina Gustafson — bekräftat i folkräkning 1890.",
              desc_de:"Alma Maria Linder, verheiratet mit Kalle Bank. Starb 1932 im Alter von 43 Jahren — Yngve war erst 7 Jahre alt. In Mjölby begraben. Eltern: Carl August Linder und Hilda Carolina Gustafson — bestätigt in der Volkszählung 1890."},
@@ -361,7 +507,7 @@ Object.keys(P).forEach(id => P[id].id = id);
 
 // ════ LAYOUT CONSTANTS ════
 const CARD_W  = 168;
-const COL_GAP = 14;
+const COL_GAP = 40;
 const COL_W   = CARD_W + COL_GAP;
 const LEAF_H  = 46;   // px per leaf slot
 const MAX_G   = 9;    // max generations (öka vid behov)
@@ -492,6 +638,17 @@ function renderDetail(id) {
     html += `<div class="det-section"><h4>${t.detNote}</h4><div class="det-note">${p.x}</div></div>`;
   }
 
+  // Foton (visas bara för inloggade + godkända)
+  if (approved && photoMap[id]?.length > 0) {
+    html += `<div class="det-section"><h4>Foton</h4><div class="det-photos">`;
+    photoMap[id].forEach(url => {
+      const safeUrl = url.replace(/'/g, '%27');
+      html += `<img class="det-photo" src="${safeUrl}" alt="" loading="lazy"
+                    onclick="openLightbox('${safeUrl}')">`;
+    });
+    html += `</div></div>`;
+  }
+
   html += '</div>'; // det-body
   detPanel.innerHTML = html;
   document.getElementById('det-close').addEventListener('click', () => {
@@ -537,28 +694,87 @@ backBtn.addEventListener('click', () => {
 });
 
 // ════ LINE DRAWING ════
+// Draws T-connectors: one stub from child's right → branch point,
+// vertical bar spanning both parents, equal stubs into each parent's left edge.
 function drawLines(ctx, slots, pos) {
   ctx.clearRect(0, 0, cv.width, cv.height);
-  ctx.lineWidth = 2;
-  ctx.lineCap = 'round';
-  slots.forEach((gen, g) => {
-    if (g === 0) return;
-    gen.forEach((parentId, i) => {
-      if (!parentId) return;
-      const childId = slots[g - 1][Math.floor(i / 2)];
-      if (!childId || !pos[childId] || !pos[parentId]) return;
-      const child  = pos[childId];
-      const parent = pos[parentId];
-      const midX = (child.x + CARD_W + parent.x) / 2;
-      ctx.strokeStyle = COLORS[P[parentId].c] || '#aaa';
+  ctx.lineWidth = 1.5;
+  ctx.lineCap  = 'round';
+  ctx.lineJoin = 'round';
+
+  for (let g = 1; g < slots.length; g++) {
+    for (let ci = 0; ci < slots[g - 1].length; ci++) {
+      const childId = slots[g - 1][ci];
+      if (!childId || !pos[childId]) continue;
+
+      const fId = slots[g][ci * 2];
+      const mId = slots[g][ci * 2 + 1];
+      const hF  = !!(fId && pos[fId]);
+      const hM  = !!(mId && pos[mId]);
+      if (!hF && !hM) continue;
+
+      const ch  = pos[childId];
+      // Branch point x = midpoint of COL_GAP (snap to half-pixel for vertical crispness)
+      const bx  = Math.round(ch.x + CARD_W + COL_GAP / 2) + 0.5;
+      const cy  = Math.round(ch.y) + 0.5;   // child center y (half-pixel)
+
+      // Child stub: horizontal from child right-edge to branch point
+      ctx.strokeStyle = '#ccc';
       ctx.beginPath();
-      ctx.moveTo(child.x + CARD_W, child.y);
-      ctx.lineTo(midX, child.y);
-      ctx.lineTo(midX, parent.y);
-      ctx.lineTo(parent.x, parent.y);
+      ctx.moveTo(Math.round(ch.x + CARD_W) + 0.5, cy);
+      ctx.lineTo(bx, cy);
       ctx.stroke();
-    });
-  });
+
+      if (hF && hM) {
+        const fy  = Math.round(pos[fId].y) + 0.5;
+        const my  = Math.round(pos[mId].y) + 0.5;
+        // Bar spans ONLY between the two parents — never extended to cy.
+        // This prevents bars from adjacent families (sharing same bx) from merging.
+        const barTop = Math.min(fy, my);
+        const barBot = Math.max(fy, my);
+
+        // Vertical bar (neutral)
+        ctx.strokeStyle = '#ccc';
+        ctx.beginPath();
+        ctx.moveTo(bx, barTop);
+        ctx.lineTo(bx, barBot);
+        ctx.stroke();
+
+        // If child was pushed outside [barTop, barBot] by overlap resolution,
+        // draw a short connector from bar end to child stub endpoint.
+        if (cy < barTop - 0.5) {
+          ctx.beginPath(); ctx.moveTo(bx, barTop); ctx.lineTo(bx, cy); ctx.stroke();
+        } else if (cy > barBot + 0.5) {
+          ctx.beginPath(); ctx.moveTo(bx, barBot); ctx.lineTo(bx, cy); ctx.stroke();
+        }
+
+        // Father stub: horizontal from branch point to father's left edge (colored)
+        ctx.strokeStyle = COLORS[P[fId].c] || '#aaa';
+        ctx.beginPath();
+        ctx.moveTo(bx, fy);
+        ctx.lineTo(Math.round(pos[fId].x) + 0.5, fy);
+        ctx.stroke();
+
+        // Mother stub: horizontal from branch point to mother's left edge (colored)
+        ctx.strokeStyle = COLORS[P[mId].c] || '#aaa';
+        ctx.beginPath();
+        ctx.moveTo(bx, my);
+        ctx.lineTo(Math.round(pos[mId].x) + 0.5, my);
+        ctx.stroke();
+
+      } else {
+        // Single parent: L-shape (branch point → vertical → parent left edge)
+        const pId = hF ? fId : mId;
+        const py  = Math.round(pos[pId].y) + 0.5;
+        ctx.strokeStyle = COLORS[P[pId].c] || '#aaa';
+        ctx.beginPath();
+        ctx.moveTo(bx, cy);
+        ctx.lineTo(bx, py);
+        ctx.lineTo(Math.round(pos[pId].x) + 0.5, py);
+        ctx.stroke();
+      }
+    }
+  }
 }
 
 // ════ RENDER ════
@@ -700,6 +916,13 @@ function render(rootId) {
         });
       }
 
+      // Fotopunkt om bilder finns för denna person
+      if (approved && photoMap[id]?.length > 0) {
+        const dot = document.createElement('div');
+        dot.className = 'photo-dot';
+        card.appendChild(dot);
+      }
+
       wrap.appendChild(card);
     });
   });
@@ -837,6 +1060,186 @@ function setLang(l) {
 document.querySelectorAll('.lang-btn').forEach(btn =>
   btn.addEventListener('click', () => setLang(btn.dataset.lang))
 );
+
+// ════════════════════════════════════════════════════════
+// BILDARKIV — KONFIGURATION
+// Fyll i dessa tre värden efter Google Cloud-setup.
+// Se docs/google-setup.md för steg-för-steg-instruktioner.
+// ════════════════════════════════════════════════════════
+const GOOG_CLIENT_ID  = 'FYLL_I_CLIENT_ID.apps.googleusercontent.com';
+const APPS_SCRIPT_URL = 'FYLL_I_APPS_SCRIPT_URL';
+const PHOTOS_JSON_URL = 'https://raw.githubusercontent.com/lausse/stamtavla/main/photos.json';
+
+// ════ FOTO-STATE ════
+let photoMap = {};    // { personId: ['url1', 'url2', ...] }
+let authUser = null;  // { email, name, picture }
+let approved  = false;
+let gsiReady  = false;
+
+// ════ JWT-PARSER (clientside, ingen server behövs) ════
+function parseJwt(token) {
+  try {
+    const b64 = token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+    return JSON.parse(atob(b64));
+  } catch(e) { return null; }
+}
+
+// ════ GOOGLE SIGN-IN CALLBACK ════
+// Kallas av GIS när användaren loggat in med Google.
+window.handleCredentialResponse = async function(response) {
+  const jwt = parseJwt(response.credential);
+  if (!jwt) return;
+
+  authUser = {
+    email:   jwt.email,
+    name:    jwt.given_name || jwt.name.split(' ')[0],
+    picture: jwt.picture || ''
+  };
+
+  // Uppdatera UI: visa user-chip
+  document.getElementById('user-name').textContent = authUser.name;
+  if (authUser.picture) document.getElementById('user-pic').src = authUser.picture;
+  document.getElementById('user-chip').style.display = 'flex';
+  document.getElementById('auth-open-btn').style.display = 'none';
+
+  // Kontrollera godkännandestatus mot Apps Script
+  try {
+    const r = await fetch(
+      `${APPS_SCRIPT_URL}?action=check&token=${encodeURIComponent(response.credential)}`
+    );
+    const d = await r.json();
+    approved = d.approved === true;
+  } catch(e) { approved = false; }
+
+  if (approved) {
+    closeApplyModal();
+    await loadPhotos();
+    renderPhotoIndicators();
+    renderDetail(currentRoot);
+  } else {
+    // Godkänd ansökan finns men inte beviljad än — visa väntande vy
+    const note = document.getElementById('apply-pending-note');
+    if (note) note.textContent = 'Din ansökan finns hos oss — vi kommer höra av oss!';
+    showApplyView('pending');
+  }
+};
+
+// ════ UTLOGGNING ════
+function signOut() {
+  if (typeof google !== 'undefined') google.accounts.id.disableAutoSelect();
+  authUser = null;
+  approved  = false;
+  photoMap  = {};
+  document.getElementById('user-chip').style.display = 'none';
+  document.getElementById('auth-open-btn').style.display = '';
+  document.querySelectorAll('.photo-dot').forEach(d => d.remove());
+  renderDetail(currentRoot);
+}
+
+// ════ HÄMTA PHOTOS.JSON ════
+async function loadPhotos() {
+  try {
+    const r = await fetch(PHOTOS_JSON_URL + '?_=' + Date.now());
+    photoMap = await r.json();
+  } catch(e) { photoMap = {}; }
+}
+
+// ════ VISA FOTOPUNKTER PÅ KORTEN ════
+function renderPhotoIndicators() {
+  document.querySelectorAll('.card[data-id]').forEach(card => {
+    const id = card.dataset.id;
+    if (photoMap[id]?.length > 0 && !card.querySelector('.photo-dot')) {
+      const dot = document.createElement('div');
+      dot.className = 'photo-dot';
+      card.appendChild(dot);
+    }
+  });
+}
+
+// ════ ANSÖKNINGSMODAL ════
+function openApplyModal() {
+  document.getElementById('apply-modal').style.display = 'flex';
+  if (authUser && !approved) {
+    showApplyView('pending');
+  } else if (authUser && approved) {
+    closeApplyModal(); // redan inloggad och godkänd — ska ej hända
+  } else {
+    showApplyView('request');
+  }
+}
+
+function closeApplyModal() {
+  document.getElementById('apply-modal').style.display = 'none';
+}
+
+function showApplyView(v) {
+  ['request','signin','pending'].forEach(n => {
+    document.getElementById('apply-view-' + n).style.display = (n === v ? '' : 'none');
+  });
+  if (v === 'signin') ensureGSI();
+}
+
+// Initierar GIS och renderar Google-knappen (körs en gång)
+function ensureGSI() {
+  if (gsiReady || typeof google === 'undefined') return;
+  google.accounts.id.initialize({
+    client_id: GOOG_CLIENT_ID,
+    callback:  handleCredentialResponse,
+    auto_select: false,
+    use_fedcm_for_prompt: false
+  });
+  google.accounts.id.renderButton(
+    document.getElementById('gsi-btn-container'),
+    { theme: 'outline', size: 'large', width: 260, text: 'signin_with' }
+  );
+  gsiReady = true;
+}
+
+// ════ SKICKA ANSÖKAN ════
+async function submitApplication() {
+  const name     = document.getElementById('apply-name').value.trim();
+  const email    = document.getElementById('apply-email').value.trim();
+  const relation = document.getElementById('apply-relation').value.trim();
+  const status   = document.getElementById('apply-status');
+
+  if (!name || !email || !relation) {
+    status.textContent = 'Fyll i alla fält.';
+    status.style.color = '#e06060';
+    return;
+  }
+  if (!/\S+@\S+\.\S+/.test(email)) {
+    status.textContent = 'Ange en giltig e-postadress.';
+    status.style.color = '#e06060';
+    return;
+  }
+
+  const btn = document.getElementById('apply-submit');
+  btn.disabled = true;
+  status.textContent = 'Skickar…';
+  status.style.color = '#888';
+
+  try {
+    const params = new URLSearchParams({ action: 'apply', name, email, relation });
+    // no-cors: vi kan inte läsa svaret men Apps Script tar emot anropet
+    await fetch(`${APPS_SCRIPT_URL}?${params}`, { mode: 'no-cors' });
+    showApplyView('pending');
+  } catch(e) {
+    status.textContent = 'Något gick fel. Försök igen eller kontakta Lasse direkt.';
+    status.style.color = '#e06060';
+    btn.disabled = false;
+  }
+}
+
+// ════ LIGHTBOX ════
+function openLightbox(url) {
+  document.getElementById('lightbox-img').src = url;
+  document.getElementById('lightbox').style.display = 'flex';
+}
+
+// Stäng modal vid klick utanför rutan
+document.getElementById('apply-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeApplyModal();
+});
 
 // ════ INIT ════
 render(currentRoot);
