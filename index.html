@@ -465,7 +465,7 @@ const P = {
              desc_de:"Alma Maria Linder, verheiratet mit Kalle Bank. Starb 1932 im Alter von 43 Jahren — Yngve war erst 7 Jahre alt. In Mjölby begraben. Eltern: Carl August Linder und Hilda Carolina Gustafson — bestätigt in der Volkszählung 1890."},
   olof:      {n:"Olof Hilmer Carlsson",    b:"1883",          s:"M",c:"svb",fi:null,        mi:null},
   elsa:      {n:"Elsa Charlotta Bergman",  b:"1890",          s:"F",c:"svb",fi:"alfred",    mi:"amanda"},
-  petar:     {n:"Petar Mitrovic",          b:null, d:"~1917", s:"M",c:"unk",fi:null,        mi:null,  x:"†WWI"},
+  petar:     {n:"Petar Mitrovic",          b:null, d:"~1917", s:"M",c:"rs", fi:null,        mi:null,  x:"†WWI"},
   stanija:   {n:"Stanija Blagojevic",      b:"~1886",         s:"F",c:"rs", fi:"jovanovic", mi:null,
              desc:"Stanija Blagojevic (f. Jovanovic), från Soko Banja. Hennes far ägde kvarn och gästhus nära staden. Fick tre söner med oklart om de hade samma far. Äldste sonen Milorad (Mile) bodde kvar i Zaječar; mellanbroder Dimitri försvann spårlöst vid bulgariska gränsen; yngste sonen Ceda överlevde Förintelsen. Stanija dog i Zaječar, år okänt.",
              desc_de:"Stanija Blagojevic (geb. Jovanovic), aus Soko Banja. Ihr Vater besaß eine Mühle und ein Gasthaus in der Nähe der Stadt. Bekam drei Söhne, möglicherweise von verschiedenen Vätern. Ältester Sohn Milorad (Mile) blieb in Zaječar; Sohn Dimitri verschwand spurlos an der bulgarischen Grenze; jüngster Sohn Ceda überlebte den Holocaust. Stanija starb in Zaječar, Todesjahr unbekannt."},
@@ -739,12 +739,12 @@ function drawLines(ctx, slots, pos) {
       if (!childId || !pos[childId]) continue;
 
       const ch = pos[childId];
-      const cx = Math.round(ch.x + CARD_W) + 0.5;  // barnets högerkant
-      const cy = Math.round(ch.y)           + 0.5;  // barnets mittpunkt y
+      const cx = Math.round(ch.x + CARD_W)               + 0.5;  // barnets högerkant
+      const cy = Math.round(ch.y)                         + 0.5;  // barnets mittpunkt y
+      const bx = Math.round(ch.x + CARD_W + COL_GAP / 2) + 0.5;  // greningspunkt (mitt i gapet)
 
-      // Rita varje förälder: horisontellt hela gapet → vertikalt till förälderns y.
-      // Linjen anländer direkt vid förälderns vänsterkant — inget kort skaft.
-      // Far ritas först, mor skriver över det delade horisontella strecket (T-effekt).
+      // T-koppling: far ritas först, mor skriver över det delade horisontella skaftet.
+      // Varje förälder får: vänsterskaft (barn→gren), vertikalt, högerskaft (gren→förälder).
       [slots[g][ci * 2], slots[g][ci * 2 + 1]].forEach(pId => {
         if (!pId || !pos[pId]) return;
         const px = Math.round(pos[pId].x) + 0.5;  // förälderns vänsterkant
@@ -752,9 +752,10 @@ function drawLines(ctx, slots, pos) {
 
         ctx.strokeStyle = COLORS[P[pId].c] || '#aaa';
         ctx.beginPath();
-        ctx.moveTo(cx, cy);  // barnets högerkant
-        ctx.lineTo(px, cy);  // horisontellt hela vägen till föräldrakolumnen
-        ctx.lineTo(px, py);  // vertikalt till förälderns höjd
+        ctx.moveTo(cx, cy);   // barnets högerkant
+        ctx.lineTo(bx, cy);   // vänsterskaft → greningspunkt
+        ctx.lineTo(bx, py);   // vertikalt till förälderns höjd
+        ctx.lineTo(px, py);   // högerskaft → förälderns vänsterkant
         ctx.stroke();
       });
     }
