@@ -937,18 +937,24 @@ function render(rootId) {
           else if (mY !== null)                pos[id].y = mY;
         });
       }
-      // Fix overlaps top→bottom within this column
+      // Fix overlaps top→bottom within this column.
+      // Extra FAMILY_SEP gap between different families (varje par far+mor = en familj).
+      const FAMILY_SEP = 50;
       let prevBot = -Infinity;
-      for (const id of slots[g]) {
-        if (!id || !pos[id]) continue;
+      let prevFamilyGroup = -1;
+      slots[g].forEach((id, j) => {
+        if (!id || !pos[id]) return;
         const card = wrap.querySelector(`.card[data-id="${id}"]`);
-        if (!card) continue;
+        if (!card) return;
         const h = card.offsetHeight;
-        const minY = prevBot + GAP + h / 2;
+        const familyGroup = Math.floor(j / 2);
+        const extraGap = (familyGroup > prevFamilyGroup && prevFamilyGroup >= 0) ? FAMILY_SEP : 0;
+        const minY = prevBot + GAP + extraGap + h / 2;
         if (pos[id].y < minY) pos[id].y = minY;
         card.style.top = pos[id].y + 'px';
         prevBot = pos[id].y + h / 2;
-      }
+        prevFamilyGroup = familyGroup;
+      });
     }
 
     // Expand canvas/wrap if cards were pushed below the original bounds
