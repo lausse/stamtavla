@@ -340,7 +340,21 @@ const LANG = {
     detSiblings: 'Syskon',
     detNote:     'Anteckning',
     detEmpty:    'Välj en person i trädet',
-    bildarkiv:   'Bildarkiv',
+    bildarkiv:      'Bildarkiv',
+    modalTitle:     '📷 Bildarkivet',
+    modalIntro:     'Stamtavlan är öppen för alla — men familjebilderna är reserverade för släktmedlemmar. Fyll i formuläret nedan så hör Lasse av sig inom några dagar.',
+    labelName:      'Ditt namn',
+    phName:         'Förnamn Efternamn',
+    labelEmail:     'Din Gmail-adress (används för inloggning)',
+    labelRelation:  'Hur ingår du i släkten?',
+    phRelation:     'T.ex. jag är dotter till Lillemor Nilsson, alltså ditt syskonbarn…',
+    btnApply:       'Skicka ansökan',
+    btnCancel:      'Avbryt',
+    btnClose:       'Stäng',
+    signinTitle:    '📷 Bildarkivet',
+    signinText:     'Du är godkänd! Logga in med ditt Google-konto för att se familjebilderna.',
+    pendingTitle:   'Ansökan skickad!',
+    pendingText:    'Lasse får ett mail med din ansökan och godkänner via sin mobil. Du får ett välkomstmail till din Gmail-adress när du är godkänd.',
   },
   de: {
     title:    'Stammbaum',
@@ -353,7 +367,21 @@ const LANG = {
     detSiblings: 'Geschwister',
     detNote:     'Notiz',
     detEmpty:    'Wähle eine Person im Baum aus',
-    bildarkiv:   'Fotoarchiv',
+    bildarkiv:      'Fotoarchiv',
+    modalTitle:     '📷 Fotoarchiv',
+    modalIntro:     'Der Stammbaum ist für alle zugänglich — aber die Familienfotos sind Familienmitgliedern vorbehalten. Füllen Sie das Formular aus, und Lasse meldet sich innerhalb weniger Tage.',
+    labelName:      'Ihr Name',
+    phName:         'Vorname Nachname',
+    labelEmail:     'Ihre Gmail-Adresse (für die Anmeldung)',
+    labelRelation:  'Wie gehören Sie zur Familie?',
+    phRelation:     'Z.B. ich bin die Tochter von Lillemor Nilsson, also Ihre Nichte…',
+    btnApply:       'Anfrage senden',
+    btnCancel:      'Abbrechen',
+    btnClose:       'Schließen',
+    signinTitle:    '📷 Fotoarchiv',
+    signinText:     'Sie sind genehmigt! Melden Sie sich mit Ihrem Google-Konto an, um die Familienfotos zu sehen.',
+    pendingTitle:   'Anfrage gesendet!',
+    pendingText:    'Lasse erhält eine E-Mail mit Ihrer Anfrage und genehmigt sie über sein Mobiltelefon. Sie erhalten eine Willkommens-E-Mail, sobald Sie genehmigt sind.',
   }
 };
 let lang = 'sv';
@@ -711,13 +739,12 @@ function drawLines(ctx, slots, pos) {
       if (!childId || !pos[childId]) continue;
 
       const ch = pos[childId];
-      const cx = Math.round(ch.x + CARD_W)              + 0.5;  // barnets högerkant
-      const cy = Math.round(ch.y)                        + 0.5;  // barnets mittpunkt y
-      const bx = Math.round(ch.x + CARD_W + COL_GAP / 2)+ 0.5;  // greningspunkt (mitt i gapet)
+      const cx = Math.round(ch.x + CARD_W) + 0.5;  // barnets högerkant
+      const cy = Math.round(ch.y)           + 0.5;  // barnets mittpunkt y
 
-      // Rita en fullständig L-formad stig för varje känd förälder.
-      // Far ritas först → mor skriver över det delade horisontella skaftet.
-      // Det ger T-effekten med rena nationalitetsfärger hela vägen.
+      // Rita varje förälder: horisontellt hela gapet → vertikalt till förälderns y.
+      // Linjen anländer direkt vid förälderns vänsterkant — inget kort skaft.
+      // Far ritas först, mor skriver över det delade horisontella strecket (T-effekt).
       [slots[g][ci * 2], slots[g][ci * 2 + 1]].forEach(pId => {
         if (!pId || !pos[pId]) return;
         const px = Math.round(pos[pId].x) + 0.5;  // förälderns vänsterkant
@@ -725,10 +752,9 @@ function drawLines(ctx, slots, pos) {
 
         ctx.strokeStyle = COLORS[P[pId].c] || '#aaa';
         ctx.beginPath();
-        ctx.moveTo(cx, cy);  // start: barnets högerkant, mittenhöjd
-        ctx.lineTo(bx, cy);  // horisontellt skaft → greningspunkt
-        ctx.lineTo(bx, py);  // vertikalt till förälderns höjd
-        ctx.lineTo(px, py);  // horisontellt skaft → förälderns vänsterkant
+        ctx.moveTo(cx, cy);  // barnets högerkant
+        ctx.lineTo(px, cy);  // horisontellt hela vägen till föräldrakolumnen
+        ctx.lineTo(px, py);  // vertikalt till förälderns höjd
         ctx.stroke();
       });
     }
@@ -1013,6 +1039,28 @@ function setLang(l) {
   document.getElementById('back').textContent = LANG[l].back;
   document.querySelector('.hint').textContent = LANG[l].hint;
   document.getElementById('auth-open-btn').textContent = '📷 ' + LANG[l].bildarkiv;
+
+  // ── Modal ──
+  const L = LANG[l];
+  const $ = id => document.getElementById(id);
+  document.querySelector('#apply-view-request h2').textContent      = L.modalTitle;
+  document.querySelector('#apply-view-request > p').textContent     = L.modalIntro;
+  const lbls = document.querySelectorAll('#apply-view-request .apply-field label');
+  if (lbls[0]) lbls[0].textContent = L.labelName;
+  if (lbls[1]) lbls[1].textContent = L.labelEmail;
+  if (lbls[2]) lbls[2].textContent = L.labelRelation;
+  $('apply-name').placeholder     = L.phName;
+  $('apply-relation').placeholder = L.phRelation;
+  $('apply-submit').textContent   = L.btnApply;
+  $('apply-cancel').textContent   = L.btnCancel;
+  $('apply-cancel2').textContent  = L.btnCancel;
+  $('apply-cancel3').textContent  = L.btnClose;
+  document.querySelector('#apply-view-signin h2').textContent = L.signinTitle;
+  document.querySelector('#apply-view-signin > p').textContent = L.signinText;
+  document.querySelector('#apply-view-pending h2').textContent = L.pendingTitle;
+  document.querySelector('#apply-view-pending p').innerHTML =
+    L.pendingText + '<br><br><small id="apply-pending-note" style="color:#bbb"></small>';
+
   render(currentRoot);
   renderDetail(currentRoot);
 }
@@ -1178,7 +1226,7 @@ async function submitApplication() {
   status.style.color = '#888';
 
   try {
-    const params = new URLSearchParams({ action: 'apply', name, email, relation });
+    const params = new URLSearchParams({ action: 'apply', name, email, relation, lang });
     // no-cors: vi kan inte läsa svaret men Apps Script tar emot anropet
     await fetch(`${APPS_SCRIPT_URL}?${params}`, { mode: 'no-cors' });
     showApplyView('pending');
@@ -1203,6 +1251,21 @@ document.getElementById('apply-modal').addEventListener('click', function(e) {
 // ════ INIT ════
 render(currentRoot);
 renderDetail(currentRoot);
+
+// Öppna inloggningsvyn automatiskt om URL innehåller ?signin=1
+// (välkomstmailet länkar hit med denna parameter)
+if (new URLSearchParams(location.search).get('signin') === '1') {
+  // Vänta tills GIS-biblioteket är laddat (async defer)
+  const waitForGSI = () => {
+    if (typeof google !== 'undefined') {
+      openApplyModal();
+      showApplyView('signin');
+    } else {
+      setTimeout(waitForGSI, 200);
+    }
+  };
+  waitForGSI();
+}
 </script>
 </body>
 </html>
