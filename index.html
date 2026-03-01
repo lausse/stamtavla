@@ -743,9 +743,9 @@ function drawLines(ctx, slots, pos) {
       const cy = Math.round(ch.y)                         + 0.5;  // barnets mittpunkt y
       const bx = Math.round(ch.x + CARD_W + COL_GAP / 2) + 0.5;  // greningspunkt (mitt i gapet)
 
-      // T-koppling: far ritas först, mor skriver över det delade horisontella skaftet.
-      // Varje förälder får: vänsterskaft (barn→gren), vertikalt, högerskaft (gren→förälder).
-      [slots[g][ci * 2], slots[g][ci * 2 + 1]].forEach(pId => {
+      // T-koppling: mor ritas först, far ritas sist och skriver över det delade horisontella skaftet.
+      // Det gör att skaftet (barn→gren) får faderns (övre) färg, inte moderns.
+      [slots[g][ci * 2 + 1], slots[g][ci * 2]].forEach(pId => {
         if (!pId || !pos[pId]) return;
         const px = Math.round(pos[pId].x) + 0.5;  // förälderns vänsterkant
         const py = Math.round(pos[pId].y) + 0.5;  // förälderns mittpunkt y
