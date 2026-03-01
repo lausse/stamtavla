@@ -340,6 +340,7 @@ const LANG = {
     detSiblings: 'Syskon',
     detNote:     'Anteckning',
     detEmpty:    'Välj en person i trädet',
+    bildarkiv:   'Bildarkiv',
   },
   de: {
     title:    'Stammbaum',
@@ -352,6 +353,7 @@ const LANG = {
     detSiblings: 'Geschwister',
     detNote:     'Notiz',
     detEmpty:    'Wähle eine Person im Baum aus',
+    bildarkiv:   'Fotoarchiv',
   }
 };
 let lang = 'sv';
@@ -694,8 +696,9 @@ backBtn.addEventListener('click', () => {
 });
 
 // ════ LINE DRAWING ════
-// Draws T-connectors: one stub from child's right → branch point,
-// vertical bar spanning both parents, equal stubs into each parent's left edge.
+// En L-formad stig per förälder, ritad i förälderns nationalitetsfärg.
+// Överlappande L-shapes skapar ett T-kopplings-utseende utan neutrala grå linjer.
+// Halvpixel-snappning (+0.5) ger skarpa linjer på canvas.
 function drawLines(ctx, slots, pos) {
   ctx.clearRect(0, 0, cv.width, cv.height);
   ctx.lineWidth = 1.5;
@@ -707,72 +710,27 @@ function drawLines(ctx, slots, pos) {
       const childId = slots[g - 1][ci];
       if (!childId || !pos[childId]) continue;
 
-      const fId = slots[g][ci * 2];
-      const mId = slots[g][ci * 2 + 1];
-      const hF  = !!(fId && pos[fId]);
-      const hM  = !!(mId && pos[mId]);
-      if (!hF && !hM) continue;
+      const ch = pos[childId];
+      const cx = Math.round(ch.x + CARD_W)              + 0.5;  // barnets högerkant
+      const cy = Math.round(ch.y)                        + 0.5;  // barnets mittpunkt y
+      const bx = Math.round(ch.x + CARD_W + COL_GAP / 2)+ 0.5;  // greningspunkt (mitt i gapet)
 
-      const ch  = pos[childId];
-      // Branch point x = midpoint of COL_GAP (snap to half-pixel for vertical crispness)
-      const bx  = Math.round(ch.x + CARD_W + COL_GAP / 2) + 0.5;
-      const cy  = Math.round(ch.y) + 0.5;   // child center y (half-pixel)
+      // Rita en fullständig L-formad stig för varje känd förälder.
+      // Far ritas först → mor skriver över det delade horisontella skaftet.
+      // Det ger T-effekten med rena nationalitetsfärger hela vägen.
+      [slots[g][ci * 2], slots[g][ci * 2 + 1]].forEach(pId => {
+        if (!pId || !pos[pId]) return;
+        const px = Math.round(pos[pId].x) + 0.5;  // förälderns vänsterkant
+        const py = Math.round(pos[pId].y) + 0.5;  // förälderns mittpunkt y
 
-      // Child stub: horizontal from child right-edge to branch point
-      ctx.strokeStyle = '#ccc';
-      ctx.beginPath();
-      ctx.moveTo(Math.round(ch.x + CARD_W) + 0.5, cy);
-      ctx.lineTo(bx, cy);
-      ctx.stroke();
-
-      if (hF && hM) {
-        const fy  = Math.round(pos[fId].y) + 0.5;
-        const my  = Math.round(pos[mId].y) + 0.5;
-        // Bar spans ONLY between the two parents — never extended to cy.
-        // This prevents bars from adjacent families (sharing same bx) from merging.
-        const barTop = Math.min(fy, my);
-        const barBot = Math.max(fy, my);
-
-        // Vertical bar (neutral)
-        ctx.strokeStyle = '#ccc';
-        ctx.beginPath();
-        ctx.moveTo(bx, barTop);
-        ctx.lineTo(bx, barBot);
-        ctx.stroke();
-
-        // If child was pushed outside [barTop, barBot] by overlap resolution,
-        // draw a short connector from bar end to child stub endpoint.
-        if (cy < barTop - 0.5) {
-          ctx.beginPath(); ctx.moveTo(bx, barTop); ctx.lineTo(bx, cy); ctx.stroke();
-        } else if (cy > barBot + 0.5) {
-          ctx.beginPath(); ctx.moveTo(bx, barBot); ctx.lineTo(bx, cy); ctx.stroke();
-        }
-
-        // Father stub: horizontal from branch point to father's left edge (colored)
-        ctx.strokeStyle = COLORS[P[fId].c] || '#aaa';
-        ctx.beginPath();
-        ctx.moveTo(bx, fy);
-        ctx.lineTo(Math.round(pos[fId].x) + 0.5, fy);
-        ctx.stroke();
-
-        // Mother stub: horizontal from branch point to mother's left edge (colored)
-        ctx.strokeStyle = COLORS[P[mId].c] || '#aaa';
-        ctx.beginPath();
-        ctx.moveTo(bx, my);
-        ctx.lineTo(Math.round(pos[mId].x) + 0.5, my);
-        ctx.stroke();
-
-      } else {
-        // Single parent: L-shape (branch point → vertical → parent left edge)
-        const pId = hF ? fId : mId;
-        const py  = Math.round(pos[pId].y) + 0.5;
         ctx.strokeStyle = COLORS[P[pId].c] || '#aaa';
         ctx.beginPath();
-        ctx.moveTo(bx, cy);
-        ctx.lineTo(bx, py);
-        ctx.lineTo(Math.round(pos[pId].x) + 0.5, py);
+        ctx.moveTo(cx, cy);  // start: barnets högerkant, mittenhöjd
+        ctx.lineTo(bx, cy);  // horisontellt skaft → greningspunkt
+        ctx.lineTo(bx, py);  // vertikalt till förälderns höjd
+        ctx.lineTo(px, py);  // horisontellt skaft → förälderns vänsterkant
         ctx.stroke();
-      }
+      });
     }
   }
 }
@@ -1054,6 +1012,7 @@ function setLang(l) {
   document.querySelector('#topbar h1').textContent = LANG[l].title;
   document.getElementById('back').textContent = LANG[l].back;
   document.querySelector('.hint').textContent = LANG[l].hint;
+  document.getElementById('auth-open-btn').textContent = '📷 ' + LANG[l].bildarkiv;
   render(currentRoot);
   renderDetail(currentRoot);
 }
