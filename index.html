@@ -420,9 +420,17 @@ const P = {
   kalle:     {n:"Carl August Nilsson",     b:"1884",d:"1973", s:"M",c:"sv", fi:null,        mi:null,  x:'"Kalle Bank"',
              desc:"Carl August Nilsson, känd som \"Kalle Bank\". Möbelfabrikstapetserare i Mjölby, ägde möbelaffär på S:t Persgatan 5 med tre anställda. Affären brann ned (även grannaffären), orsaken är okänd. Efterlämnade tre barn: Anne-Marie, Tage och Yngve.",
              desc_de:"Carl August Nilsson, bekannt als \"Kalle Bank\". Möbeltapezierer in Mjölby, besaß ein Möbelgeschäft in der S:t Persgatan 5 mit drei Angestellten. Das Geschäft brannte ab (auch das Nachbargeschäft), Ursache unbekannt. Hinterließ drei Kinder: Anne-Marie, Tage und Yngve."},
-  augustl:   {n:"Carl August Linder",      b:"1863",          s:"M",c:"sv", fi:null,        mi:null,
-             desc:"Carl August Linder, kvarnarbetare i Mjölby. Bekräftad i Riksarkivet folkräkning 1890 (Westra Eldslösa Rusthåll, Mjölby). Far till Alma Maria och Carl Thure Linder. Gift med Hilda Carolina Gustafson.",
-             desc_de:"Carl August Linder, Mühlenarbeiter in Mjölby. Bestätigt im Riksarkivet Volkszählung 1890. Vater von Alma Maria und Carl Thure Linder. Verheiratet mit Hilda Carolina Gustafson."},
+  augustl:   {n:"Carl August Linder",      b:"25.1.1863",d:"5.11.1935", s:"M",c:"sv", fi:null, mi:null,
+             desc:"Carl August Linder, kvarnmästare i Mjölby (*25.1.1863 †5.11.1935). Förf. 'Krönika fr gamla Mjölby'. Lindergatan i Mjölby är uppkallad efter honom. Gift med Hilda Gustafsson. Källa: Mjölbybor (1981) s.44 ✅",
+             desc_de:"Carl August Linder, Mühlenmeister in Mjölby (*25.1.1863 †5.11.1935). Verfasser einer Chronik über das alte Mjölby. Die Lindergatan in Mjölby ist nach ihm benannt. Quelle: Mjölbybor (1981) S.44 ✅"},
+  thurel:    {n:"Carl Thure Linder",       b:"1889",d:"1981", s:"M",c:"sv", fi:"augustl",   mi:"hildac",
+             desc:"Carl Thure Linder (*1889 †1981). Bror till Alma Maria Linder. Gift med Augusta Alexandersson. Källa: Mjölbybor (1981) s.44 ✅"},
+  viktorial: {n:"Viktoria Linder",         b:"1892",d:"1907", s:"F",c:"sv", fi:"augustl",   mi:"hildac",
+             desc:"Viktoria Linder (*1892 †1907), dog 15 år gammal. Syster till Alma. Källa: Mjölbybor (1981) s.44 ✅"},
+  axell:     {n:"Axel Linder",             b:"1896",d:"1979", s:"M",c:"sv", fi:"augustl",   mi:"hildac",
+             desc:"Axel Linder (*1896 †1979), ritkontorschef. Bror till Alma. Gift med Agda Björk. Källa: Mjölbybor (1981) s.44 ✅"},
+  ellenl:    {n:"Ellen Linder",            b:"1900",          s:"F",c:"sv", fi:"augustl",   mi:"hildac",
+             desc:"Ellen Linder (*1900), telefonist i Mjölby. Yngsta syster till Alma. Troligen 'moster Ellen' dit Annmari Nilsson flyttade efter Almas bortgång 1932. 📷 Foto finns i familjens ägo. Källa: Mjölbybor (1981) s.44 ✅"},
   hildac:    {n:"Hilda Carolina Gustafson", b:"1865",         s:"F",c:"sv", fi:"gustafh",   mi:"annabn",
              desc:"Hilda Carolina Gustafson, född i Mjölby. Bekräftad i Riksarkivet folkräkning 1890. Gift med Carl August Linder. ⚠️ Trolig dotter till Gustaf Hindrik Gustafsson (*1816) och Anna Brita Nilsdotter — men Gustaf Hindrik dog 22.4.1863, dvs. två år innan Hildas uppgivna födelseår 1865. Möjlig förklaring: Anna Britas dotter med okänd far, som tog Gustafson-namnet, eller felaktigt födelseår i 1890 års census.",
              desc_de:"Hilda Carolina Gustafson, geboren in Mjölby. Bestätigt in der Volkszählung 1890. Verheiratet mit Carl August Linder. ⚠️ Wahrscheinlich Tochter von Gustaf Hindrik Gustafsson (*1816) und Anna Brita Nilsdotter — aber Gustaf Hindrik starb 1863, zwei Jahre vor Hildas Geburt 1865."},
@@ -741,15 +749,6 @@ function drawLines(ctx, slots, pos) {
         ctx.stroke();
       });
 
-      // Skaft i faderns färg — kort horisontellt segment vid barnets högerkant.
-      const fatherId = slots[g][ci * 2];
-      if (fatherId && P[fatherId]) {
-        ctx.strokeStyle = COLORS[P[fatherId].c] || '#aaa';
-        ctx.beginPath();
-        ctx.moveTo(cx, cy);
-        ctx.lineTo(cx + COL_GAP * 0.35, cy);
-        ctx.stroke();
-      }
     }
   }
 }
