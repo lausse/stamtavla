@@ -709,9 +709,9 @@ backBtn.addEventListener('click', () => {
 });
 
 // ════ LINE DRAWING ════
-// En L-formad stig per förälder, ritad i förälderns nationalitetsfärg.
-// Överlappande L-shapes skapar ett T-kopplings-utseende utan neutrala grå linjer.
-// Halvpixel-snappning (+0.5) ger skarpa linjer på canvas.
+// S-kurva (bezier) per förälder i förälderns nationalitetsfärg.
+// Undviker de rätvinkelskorsningar som L-former skapar.
+// Skaftet (kort horisontellt segment vid barnet) ritas sist i faderns färg.
 function drawLines(ctx, slots, pos) {
   ctx.clearRect(0, 0, cv.width, cv.height);
   ctx.lineWidth = 1.5;
@@ -719,40 +719,37 @@ function drawLines(ctx, slots, pos) {
   ctx.lineJoin = 'round';
 
   for (let g = 1; g < slots.length; g++) {
-    // Beräkna unik greningspunkt (bx) per barn — sprider barnen jämnt över gapet
-    // så deras vertikala linjesegment inte staplas ovanpå varandra.
-    const rankMap = {};
-    let rank = 0;
-    slots[g - 1].forEach((id, idx) => { if (id && pos[id]) rankMap[idx] = rank++; });
-    const nLanes   = Math.max(rank, 1);
-    const laneStep = Math.min(10, COL_GAP / (nLanes + 1));
-    const laneOff  = (COL_GAP - laneStep * (nLanes - 1)) / 2;
-
     for (let ci = 0; ci < slots[g - 1].length; ci++) {
       const childId = slots[g - 1][ci];
       if (!childId || !pos[childId]) continue;
 
-      const ch  = pos[childId];
-      const cx  = Math.round(ch.x + CARD_W) + 0.5;
-      const cy  = Math.round(ch.y)          + 0.5;
-      const myRank = rankMap[ci] ?? 0;
-      const bxOff  = nLanes > 1 ? laneOff + myRank * laneStep : COL_GAP / 2;
-      const bx  = Math.round(ch.x + CARD_W + bxOff) + 0.5;
+      const ch = pos[childId];
+      const cx = Math.round(ch.x + CARD_W) + 0.5;
+      const cy = Math.round(ch.y)          + 0.5;
 
-      // T-koppling: mor ritas först, far ritas sist → skaftet får faderns (övre) färg.
+      // Mor ritas först, far sist (far syns överst vid eventuell överlappning).
       [slots[g][ci * 2 + 1], slots[g][ci * 2]].forEach(pId => {
         if (!pId || !pos[pId]) return;
-        const px = Math.round(pos[pId].x) + 0.5;  // förälderns vänsterkant
-        const py = Math.round(pos[pId].y) + 0.5;  // förälderns mittpunkt y
+        const px  = Math.round(pos[pId].x) + 0.5;
+        const py  = Math.round(pos[pId].y) + 0.5;
+        const midX = (cx + px) / 2;
 
         ctx.strokeStyle = COLORS[P[pId].c] || '#aaa';
         ctx.beginPath();
-        ctx.moveTo(cx, cy);   // barnets högerkant
-        ctx.lineTo(bx, cy);   // vänsterskaft → greningspunkt
-        ctx.lineTo(bx, py);   // vertikalt till förälderns höjd
-        ctx.lineTo(px, py);   // högerskaft → förälderns vänsterkant
+        ctx.moveTo(cx, cy);
+        ctx.bezierCurveTo(midX, cy, midX, py, px, py);
         ctx.stroke();
       });
+
+      // Skaft i faderns färg — kort horisontellt segment vid barnets högerkant.
+      const fatherId = slots[g][ci * 2];
+      if (fatherId && P[fatherId]) {
+        ctx.strokeStyle = COLORS[P[fatherId].c] || '#aaa';
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + COL_GAP * 0.35, cy);
+        ctx.stroke();
+      }
     }
   }
 }
