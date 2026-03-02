@@ -227,6 +227,52 @@ body.lang-de .barn::before { content: 'Kinder: '; }
 }
 .photos-link:hover { background: #3a3a3a; color: #fff; }
 
+/* ── Admin-panel ── */
+#admin-modal {
+  position: fixed; inset: 0; background: rgba(0,0,0,.5);
+  z-index: 100; display: none; align-items: flex-start;
+  justify-content: center; padding-top: 60px;
+}
+#admin-box {
+  background: white; border-radius: 18px;
+  width: 92%; max-width: 700px; max-height: 78vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 8px 40px rgba(0,0,0,.22);
+}
+#admin-head {
+  padding: 16px 20px; display: flex; align-items: center;
+  border-bottom: 1px solid #eee; flex-shrink: 0; gap: 10px;
+}
+#admin-head h2 { font-size: 14px; font-weight: 700; flex: 1; color: #222; }
+#admin-head-close { background: none; border: none; font-size: 17px; color: #bbb; cursor: pointer; line-height: 1; }
+#admin-head-close:hover { color: #666; }
+#admin-body { flex: 1; overflow-y: auto; }
+.admin-row {
+  display: grid; grid-template-columns: 1.4fr 1.6fr auto;
+  padding: 10px 18px; border-bottom: 1px solid #f2f2f2;
+  gap: 12px; align-items: center;
+}
+.admin-row:last-child { border-bottom: none; }
+.admin-name  { font-size: 12.5px; font-weight: 700; color: #222; }
+.admin-email { font-size: 10.5px; color: #aaa; margin-top: 1px; }
+.admin-relation { font-size: 11.5px; color: #666; line-height: 1.4; }
+.admin-right { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+.badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 8px; white-space: nowrap; }
+.badge-ok  { background: #e0f5e8; color: #1a7a3a; }
+.badge-wait{ background: #fff3cc; color: #8a6000; }
+.badge-no  { background: #fde8e8; color: #a02020; }
+.adm-ok { padding: 4px 11px; border-radius: 8px; border: none; background: #2a9a50; color: white; font-size: 11px; cursor: pointer; }
+.adm-no { padding: 4px 11px; border-radius: 8px; border: none; background: #e06060; color: white; font-size: 11px; cursor: pointer; }
+.adm-ok:hover { background: #1a7a3a; }
+.adm-no:hover { background: #c04040; }
+.admin-empty { padding: 40px; text-align: center; color: #bbb; font-size: 13px; font-style: italic; }
+#admin-btn {
+  padding: 5px 10px; border-radius: 20px; border: 1.5px solid #ddd;
+  background: white; font-size: 13px; cursor: pointer; color: #777;
+  transition: background .1s; display: none;
+}
+#admin-btn:hover { background: #f5f5f5; }
+
 /* ── Toast ── */
 #toast {
   position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
@@ -246,6 +292,19 @@ body.lang-de .barn::before { content: 'Kinder: '; }
 
 <div id="toast"></div>
 
+<!-- ── Admin-panel ── -->
+<div id="admin-modal">
+  <div id="admin-box">
+    <div id="admin-head">
+      <h2>📋 Bildarkiv — ansökningar</h2>
+      <button id="admin-head-close" onclick="closeAdminPanel()">✕</button>
+    </div>
+    <div id="admin-body">
+      <div class="admin-empty">Laddar…</div>
+    </div>
+  </div>
+</div>
+
 <div id="topbar">
   <h1 onclick="goHome()" title="Gå till startvyn (Lasse)">Stamtavla</h1>
   <span id="focus-name"></span>
@@ -256,6 +315,7 @@ body.lang-de .barn::before { content: 'Kinder: '; }
     <button class="lang-btn"        data-lang="de">🇩🇪</button>
   </div>
   <div id="auth-zone">
+    <button id="admin-btn" onclick="openAdminPanel()" title="Bildarkiv — ansökningar">📋 Admin</button>
     <button id="auth-open-btn" onclick="openApplyModal()">📷 Bildarkiv</button>
     <div id="user-chip">
       <img id="user-pic" src="" alt="">
@@ -1273,9 +1333,11 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwgRXCv0_UmjFfL
 const PHOTOS_ALBUM_URL = 'https://photos.app.goo.gl/taPU3v54CCnBHVX97';
 
 // ════ AUTH STATE ════
-let authUser = null;  // { email, name, picture }
+let authUser  = null;  // { email, name, picture }
+let authToken = null;  // Google ID-token (för API-anrop)
 let approved  = false;
 let gsiReady  = false;
+const LASSE_EMAIL_CLIENT = 'lausse@gmail.com';
 
 // ════ JWT-PARSER (clientside, ingen server behövs) ════
 function parseJwt(token) {
@@ -1291,6 +1353,7 @@ window.handleCredentialResponse = async function(response) {
   const jwt = parseJwt(response.credential);
   if (!jwt) return;
 
+  authToken = response.credential;
   authUser = {
     email:   jwt.email,
     name:    jwt.given_name || jwt.name.split(' ')[0],
@@ -1316,6 +1379,8 @@ window.handleCredentialResponse = async function(response) {
     closeApplyModal();
     renderPhotoIndicators();
     renderDetail(currentRoot);
+    if (authUser.email.toLowerCase() === LASSE_EMAIL_CLIENT)
+      document.getElementById('admin-btn').style.display = '';
   } else {
     // Inloggad men ej godkänd: visa ansökningsformuläret (med namn förifyllt från Google)
     const nameEl = document.getElementById('apply-name');
@@ -1330,13 +1395,90 @@ window.handleCredentialResponse = async function(response) {
 // ════ UTLOGGNING ════
 function signOut() {
   if (typeof google !== 'undefined') google.accounts.id.disableAutoSelect();
-  authUser = null;
+  authUser  = null;
+  authToken = null;
   approved  = false;
   document.getElementById('user-chip').style.display = 'none';
   document.getElementById('auth-open-btn').style.display = '';
+  document.getElementById('admin-btn').style.display = 'none';
   document.querySelectorAll('.photo-dot').forEach(d => d.remove());
+  closeAdminPanel();
   renderDetail(currentRoot);
 }
+
+// ════ ADMIN-PANEL ════
+async function openAdminPanel() {
+  document.getElementById('admin-modal').style.display = 'flex';
+  document.getElementById('admin-body').innerHTML = '<div class="admin-empty">Laddar…</div>';
+  try {
+    const r = await fetch(`${APPS_SCRIPT_URL}?action=list&token=${encodeURIComponent(authToken)}`);
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'fel');
+    renderAdminRows(d.rows);
+  } catch(e) {
+    document.getElementById('admin-body').innerHTML =
+      `<div class="admin-empty">Kunde inte hämta listan: ${escHtml(e.message)}</div>`;
+  }
+}
+
+function closeAdminPanel() {
+  document.getElementById('admin-modal').style.display = 'none';
+}
+
+function renderAdminRows(rows) {
+  if (!rows || !rows.length) {
+    document.getElementById('admin-body').innerHTML =
+      '<div class="admin-empty">Inga ansökningar ännu.</div>';
+    return;
+  }
+  const order = { 'VÄNTAR': 0, 'GODKÄND': 1, 'NEKAD': 2 };
+  rows.sort((a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3));
+
+  const html = rows.map(row => {
+    const badgeCls = row.status === 'GODKÄND' ? 'badge-ok'
+                   : row.status === 'NEKAD'   ? 'badge-no' : 'badge-wait';
+    const right = row.status === 'VÄNTAR'
+      ? `<button class="adm-ok" onclick="adminAction('approve','${escHtml(row.email)}')">✓ Godkänn</button>
+         <button class="adm-no" onclick="adminAction('deny','${escHtml(row.email)}')">✗ Neka</button>`
+      : `<span class="badge ${badgeCls}">${escHtml(row.status)}</span>`;
+    return `<div class="admin-row">
+      <div>
+        <div class="admin-name">${escHtml(row.name)}</div>
+        <div class="admin-email">${escHtml(row.email)}</div>
+        <div class="admin-email" style="margin-top:1px;color:#ccc">${escHtml(row.ts)}</div>
+      </div>
+      <div class="admin-relation">${escHtml(row.relation)}</div>
+      <div class="admin-right">${right}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('admin-body').innerHTML = html;
+}
+
+function escHtml(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function adminAction(type, email) {
+  const action = type === 'approve' ? 'admin_approve' : 'admin_deny';
+  try {
+    const r = await fetch(
+      `${APPS_SCRIPT_URL}?action=${action}&applyEmail=${encodeURIComponent(email)}&token=${encodeURIComponent(authToken)}`
+    );
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'fel');
+    if (type === 'approve') showToast('✓ Godkänd — välkomstmail skickat');
+    else showToast('✗ Ansökan nekad');
+    openAdminPanel(); // ladda om listan
+  } catch(e) {
+    showToast(`Fel: ${escHtml(e.message)}`);
+  }
+}
+
+// Stäng admin-panel vid klick utanför
+document.getElementById('admin-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeAdminPanel();
+});
 
 // ════ VISA FOTOIKONER PÅ KORTEN ════
 function renderPhotoIndicators() {
