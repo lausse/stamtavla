@@ -719,17 +719,27 @@ function drawLines(ctx, slots, pos) {
   ctx.lineJoin = 'round';
 
   for (let g = 1; g < slots.length; g++) {
+    // Beräkna unik greningspunkt (bx) per barn — sprider barnen jämnt över gapet
+    // så deras vertikala linjesegment inte staplas ovanpå varandra.
+    const rankMap = {};
+    let rank = 0;
+    slots[g - 1].forEach((id, idx) => { if (id && pos[id]) rankMap[idx] = rank++; });
+    const nLanes   = Math.max(rank, 1);
+    const laneStep = Math.min(10, COL_GAP / (nLanes + 1));
+    const laneOff  = (COL_GAP - laneStep * (nLanes - 1)) / 2;
+
     for (let ci = 0; ci < slots[g - 1].length; ci++) {
       const childId = slots[g - 1][ci];
       if (!childId || !pos[childId]) continue;
 
-      const ch = pos[childId];
-      const cx = Math.round(ch.x + CARD_W)               + 0.5;  // barnets högerkant
-      const cy = Math.round(ch.y)                         + 0.5;  // barnets mittpunkt y
-      const bx = Math.round(ch.x + CARD_W + COL_GAP / 2) + 0.5;  // greningspunkt (mitt i gapet)
+      const ch  = pos[childId];
+      const cx  = Math.round(ch.x + CARD_W) + 0.5;
+      const cy  = Math.round(ch.y)          + 0.5;
+      const myRank = rankMap[ci] ?? 0;
+      const bxOff  = nLanes > 1 ? laneOff + myRank * laneStep : COL_GAP / 2;
+      const bx  = Math.round(ch.x + CARD_W + bxOff) + 0.5;
 
-      // T-koppling: mor ritas först, far ritas sist och skriver över det delade horisontella skaftet.
-      // Det gör att skaftet (barn→gren) får faderns (övre) färg, inte moderns.
+      // T-koppling: mor ritas först, far ritas sist → skaftet får faderns (övre) färg.
       [slots[g][ci * 2 + 1], slots[g][ci * 2]].forEach(pId => {
         if (!pId || !pos[pId]) return;
         const px = Math.round(pos[pId].x) + 0.5;  // förälderns vänsterkant
