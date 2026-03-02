@@ -282,19 +282,24 @@ body.lang-de .barn::before { content: 'Kinder: '; }
 <div id="apply-modal">
   <div id="apply-box">
 
-    <!-- Vy 1: Ansökningsformulär -->
-    <div id="apply-view-request">
+    <!-- Vy 1: Logga in med Google (visas alltid först) -->
+    <div id="apply-view-signin">
       <h2>📷 Bildarkivet</h2>
-      <p>Stamtavlan är öppen för alla — men familjebilderna är reserverade för släktmedlemmar.
-         Fyll i formuläret nedan så hör Lasse av sig inom några dagar.</p>
+      <p>Logga in med ditt Google-konto för att se familjebilderna.<br>
+         <small style="color:#bbb">Har du inte tillgång ännu? Vi skickar en förfrågan till Lasse automatiskt efter inloggningen.</small></p>
+      <div id="gsi-btn-container"></div>
+      <button id="apply-cancel2" onclick="closeApplyModal()">Avbryt</button>
+    </div>
+
+    <!-- Vy 2: Ansök om tillgång (visas om inte godkänd ännu) -->
+    <div id="apply-view-request" style="display:none">
+      <h2>📷 Ansök om tillgång</h2>
+      <p id="apply-intro-text">Ditt Google-konto är inte godkänt ännu. Fyll i ditt namn och hur du är släkt med Lasse — han godkänner via sin mobil.</p>
       <div class="apply-field">
         <label>Ditt namn</label>
         <input id="apply-name" type="text" placeholder="Förnamn Efternamn" autocomplete="name">
       </div>
-      <div class="apply-field">
-        <label>Din Gmail-adress (används för inloggning)</label>
-        <input id="apply-email" type="email" placeholder="du@gmail.com" autocomplete="email">
-      </div>
+      <input id="apply-email" type="hidden">
       <div class="apply-field">
         <label>Hur ingår du i släkten?</label>
         <textarea id="apply-relation" placeholder="T.ex. jag är dotter till Lillemor Nilsson, alltså ditt syskonbarn…"></textarea>
@@ -302,14 +307,6 @@ body.lang-de .barn::before { content: 'Kinder: '; }
       <button id="apply-submit" onclick="submitApplication()">Skicka ansökan</button>
       <div id="apply-status"></div>
       <button id="apply-cancel" onclick="closeApplyModal()">Avbryt</button>
-    </div>
-
-    <!-- Vy 2: Logga in med Google (för godkända) -->
-    <div id="apply-view-signin" style="display:none">
-      <h2>📷 Bildarkivet</h2>
-      <p>Du är godkänd! Logga in med ditt Google-konto för att se familjebilderna.</p>
-      <div id="gsi-btn-container"></div>
-      <button id="apply-cancel2" onclick="closeApplyModal()">Avbryt</button>
     </div>
 
     <!-- Vy 3: Ansökan skickad -->
@@ -358,9 +355,9 @@ const LANG = {
     btnCancel:      'Avbryt',
     btnClose:       'Stäng',
     signinTitle:    '📷 Bildarkivet',
-    signinText:     'Du är godkänd! Logga in med ditt Google-konto för att se familjebilderna.',
+    signinText:     'Logga in med ditt Google-konto för att se familjebilderna.',
     pendingTitle:   'Ansökan skickad!',
-    pendingText:    'Lasse får ett mail med din ansökan och godkänner via sin mobil. Du får ett välkomstmail till din Gmail-adress när du är godkänd.',
+    pendingText:    'Lasse får ett mail med din ansökan och godkänner via sin mobil. Nästa gång du loggar in med samma Google-konto får du direkt tillgång.',
   },
   de: {
     title:    'Stammbaum',
@@ -385,9 +382,9 @@ const LANG = {
     btnCancel:      'Abbrechen',
     btnClose:       'Schließen',
     signinTitle:    '📷 Fotoarchiv',
-    signinText:     'Sie sind genehmigt! Melden Sie sich mit Ihrem Google-Konto an, um die Familienfotos zu sehen.',
+    signinText:     'Melden Sie sich mit Ihrem Google-Konto an, um die Familienfotos zu sehen.',
     pendingTitle:   'Anfrage gesendet!',
-    pendingText:    'Lasse erhält eine E-Mail mit Ihrer Anfrage und genehmigt sie über sein Mobiltelefon. Sie erhalten eine Willkommens-E-Mail, sobald Sie genehmigt sind.',
+    pendingText:    'Lasse erhält eine E-Mail mit Ihrer Anfrage und genehmigt sie über sein Mobiltelefon. Beim nächsten Login erhalten Sie direkt Zugang.',
   }
 };
 let lang = 'sv';
@@ -1320,10 +1317,13 @@ window.handleCredentialResponse = async function(response) {
     renderPhotoIndicators();
     renderDetail(currentRoot);
   } else {
-    // Godkänd ansökan finns men inte beviljad än — visa väntande vy
-    const note = document.getElementById('apply-pending-note');
-    if (note) note.textContent = 'Din ansökan finns hos oss — vi kommer höra av oss!';
-    showApplyView('pending');
+    // Inloggad men ej godkänd: visa ansökningsformuläret (med namn förifyllt från Google)
+    const nameEl = document.getElementById('apply-name');
+    if (nameEl) nameEl.value = authUser.name || '';
+    document.getElementById('apply-email').value = authUser.email || '';
+    // Öppna modal om den inte redan är öppen
+    document.getElementById('apply-modal').style.display = 'flex';
+    showApplyView('request');
   }
 };
 
@@ -1356,12 +1356,16 @@ function renderPhotoIndicators() {
 // ════ ANSÖKNINGSMODAL ════
 function openApplyModal() {
   document.getElementById('apply-modal').style.display = 'flex';
-  if (authUser && !approved) {
-    showApplyView('pending');
-  } else if (authUser && approved) {
+  if (authUser && approved) {
     closeApplyModal(); // redan inloggad och godkänd — ska ej hända
-  } else {
+  } else if (authUser && !approved) {
+    // Inloggad men ej godkänd: hoppa direkt till ansökningsformuläret
+    document.getElementById('apply-name').value = authUser.name || '';
+    document.getElementById('apply-email').value = authUser.email || '';
     showApplyView('request');
+  } else {
+    // Ej inloggad: visa Google-knappen
+    showApplyView('signin');
   }
 }
 
@@ -1373,39 +1377,39 @@ function showApplyView(v) {
   ['request','signin','pending'].forEach(n => {
     document.getElementById('apply-view-' + n).style.display = (n === v ? '' : 'none');
   });
-  if (v === 'signin') ensureGSI();
 }
 
-// Initierar GIS och renderar Google-knappen (körs en gång)
-function ensureGSI() {
+// Initierar GIS med auto_select — körs en gång vid sidladdning
+function initGSI() {
   if (gsiReady || typeof google === 'undefined') return;
   google.accounts.id.initialize({
     client_id: GOOG_CLIENT_ID,
     callback:  handleCredentialResponse,
-    auto_select: false,
+    auto_select: true,          // loggar in automatiskt om session finns
     use_fedcm_for_prompt: false
   });
   google.accounts.id.renderButton(
     document.getElementById('gsi-btn-container'),
     { theme: 'outline', size: 'large', width: 260, text: 'signin_with' }
   );
+  google.accounts.id.prompt(); // One Tap-popup för återvändande användare
   gsiReady = true;
 }
 
 // ════ SKICKA ANSÖKAN ════
 async function submitApplication() {
   const name     = document.getElementById('apply-name').value.trim();
-  const email    = document.getElementById('apply-email').value.trim();
+  const email    = (authUser && authUser.email) || document.getElementById('apply-email').value.trim();
   const relation = document.getElementById('apply-relation').value.trim();
   const status   = document.getElementById('apply-status');
 
-  if (!name || !email || !relation) {
-    status.textContent = 'Fyll i alla fält.';
+  if (!name || !relation) {
+    status.textContent = 'Fyll i namn och hur du är släkt.';
     status.style.color = '#e06060';
     return;
   }
-  if (!/\S+@\S+\.\S+/.test(email)) {
-    status.textContent = 'Ange en giltig e-postadress.';
+  if (!email) {
+    status.textContent = 'E-postadress saknas — logga in med Google först.';
     status.style.color = '#e06060';
     return;
   }
@@ -1438,19 +1442,25 @@ document.getElementById('apply-modal').addEventListener('click', function(e) {
 render(currentRoot);
 renderDetail(currentRoot);
 
-// Öppna inloggningsvyn automatiskt om URL innehåller ?signin=1
-// (välkomstmailet länkar hit med denna parameter)
+// Starta GIS så fort biblioteket är laddat — hanterar auto-login för återvändande användare
+// och gör Google-knappen redo direkt när modalen öppnas
+(function waitAndInitGSI() {
+  if (typeof google !== 'undefined') {
+    initGSI();
+  } else {
+    setTimeout(waitAndInitGSI, 150);
+  }
+})();
+
+// ?signin=1 i välkomstmailet: öppna modalen direkt
 if (new URLSearchParams(location.search).get('signin') === '1') {
-  // Vänta tills GIS-biblioteket är laddat (async defer)
-  const waitForGSI = () => {
-    if (typeof google !== 'undefined') {
+  (function waitForGSI() {
+    if (gsiReady) {
       openApplyModal();
-      showApplyView('signin');
     } else {
-      setTimeout(waitForGSI, 200);
+      setTimeout(waitForGSI, 150);
     }
-  };
-  waitForGSI();
+  })();
 }
 </script>
 </body>
