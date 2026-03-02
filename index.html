@@ -222,16 +222,32 @@ body.lang-de .barn::before { content: 'Kinder: '; }
   display: inline-block; margin-top: 6px;
   padding: 6px 12px; border-radius: 8px;
   background: #2a2a2a; color: #ccc;
-  font-size: 13px; text-decoration: none;
+  font-size: 13px; text-decoration: none; cursor: pointer; border: none;
   transition: background .15s, color .15s;
 }
 .photos-link:hover { background: #3a3a3a; color: #fff; }
+
+/* ── Toast ── */
+#toast {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+  background: rgba(40,40,40,.93); color: #fff;
+  padding: 9px 18px; border-radius: 20px; font-size: 12.5px;
+  pointer-events: none; z-index: 200; opacity: 0;
+  transition: opacity .2s; white-space: nowrap;
+}
+#toast.show { opacity: 1; }
+
+/* ── Stamtavla-titel klickbar ── */
+#topbar h1 { cursor: pointer; }
+#topbar h1:hover { color: #5ab6e0; }
 </style>
 </head>
 <body class="lang-sv">
 
+<div id="toast"></div>
+
 <div id="topbar">
-  <h1>Stamtavla</h1>
+  <h1 onclick="goHome()" title="Gå till startvyn (Lasse)">Stamtavla</h1>
   <span id="focus-name"></span>
   <button id="back" disabled>← Tillbaka</button>
   <span class="hint">Klicka ett syskon för att centrera trädet på den personen</span>
@@ -545,6 +561,86 @@ const P = {
   // Gertrud Lammerdings son
   udo:      {n:"Udo Schubert",        b:"1963", s:"M", c:"de",  fi:null,      mi:"gertrudl"},
   mkteves:   {n:"Maria K. Teves",          b:null,            s:"F",c:"de", fi:null,        mi:null},
+
+  // ── Gustaf Hindrik Gustafssons övriga barn (utöver fransgg och oskarfg) ──
+  johanadolfg:  {n:"Johan Adolf Gustafsson",  b:"1843", s:"M",c:"sv", fi:"gustafh", mi:"annabn",
+                 desc:"Johan Adolf Gustafsson, *ca 1843 Mjölby. Son till Gustaf Hindrik Gustafsson och Anna Brita Nilsdotter. Källa: Linder-pärmens Nr 4 ✅.",
+                 desc_de:"Johan Adolf Gustafsson, *ca. 1843 Mjölby. Sohn von Gustaf Hindrik Gustafsson und Anna Brita Nilsdotter. Quelle: Nr. 4 im Linder-Ordner ✅."},
+  clarag:       {n:"Clara Gustafsson",         b:"1846", s:"F",c:"sv", fi:"gustafh", mi:"annabn",
+                 desc:"Clara Gustafsson, *ca 1846 Mjölby. Dotter till Gustaf Hindrik Gustafsson och Anna Brita Nilsdotter. Källa: Linder-pärmens Nr 4 ✅.",
+                 desc_de:"Clara Gustafsson, *ca. 1846 Mjölby. Tochter von Gustaf Hindrik Gustafsson und Anna Brita Nilsdotter. Quelle: Nr. 4 im Linder-Ordner ✅."},
+  annamathildag:{n:"Anna Mathilda Gustafsson", b:"1848", s:"F",c:"sv", fi:"gustafh", mi:"annabn",
+                 desc:"Anna Mathilda Gustafsson, *ca 1848 Mjölby. Dotter till Gustaf Hindrik Gustafsson och Anna Brita Nilsdotter. Källa: Linder-pärmens Nr 4 ✅.",
+                 desc_de:"Anna Mathilda Gustafsson, *ca. 1848 Mjölby. Tochter von Gustaf Hindrik Gustafsson und Anna Brita Nilsdotter. Quelle: Nr. 4 im Linder-Ordner ✅."},
+  johannag:     {n:"Johanna Gustafsson",       b:"1852", s:"F",c:"sv", fi:"gustafh", mi:"annabn",
+                 desc:"Johanna Gustafsson, *ca 1852 Mjölby. Dotter till Gustaf Hindrik Gustafsson och Anna Brita Nilsdotter. Källa: Linder-pärmens Nr 4 ✅.",
+                 desc_de:"Johanna Gustafsson, *ca. 1852 Mjölby. Tochter von Gustaf Hindrik Gustafsson und Anna Brita Nilsdotter. Quelle: Nr. 4 im Linder-Ordner ✅."},
+  ottog:        {n:"Otto Gustafsson",          b:"1859", s:"M",c:"sv", fi:"gustafh", mi:"annabn",
+                 desc:"Otto Gustafsson, *ca 1859 Mjölby. Son till Gustaf Hindrik Gustafsson och Anna Brita Nilsdotter. Källa: Linder-pärmens Nr 4 ✅.",
+                 desc_de:"Otto Gustafsson, *ca. 1859 Mjölby. Sohn von Gustaf Hindrik Gustafsson und Anna Brita Nilsdotter. Quelle: Nr. 4 im Linder-Ordner ✅."},
+
+  // ── Anders Anderssons övriga barn (utöver augustl) ──
+  johannasofiaa:{n:"Johanna Sofia Andersson",  b:"1854", s:"F",c:"sv", fi:"andersandersson", mi:"heddasofia",
+                 desc:"Johanna Sofia Andersson, *1854 Mjölby. Dotter till Anders Andersson och Hedda Sofia Nilsdotter. Utflyttad 1883. ✅ HFL AI:29 sid.347.",
+                 desc_de:"Johanna Sofia Andersson, *1854 Mjölby. Tochter von Anders Andersson und Hedda Sofia Nilsdotter. Ausgezogen 1883. ✅ Quelle: HFL AI:29 S.347."},
+  andersgustafa:{n:"Anders Gustaf Andersson",  b:"1865", s:"M",c:"sv", fi:"andersandersson", mi:"heddasofia",
+                 desc:"Anders Gustaf Andersson, *1865 Mjölby. Son till Anders Andersson och Hedda Sofia Nilsdotter. ✅ HFL AI:29 sid.347.",
+                 desc_de:"Anders Gustaf Andersson, *1865 Mjölby. Sohn von Anders Andersson und Hedda Sofia Nilsdotter. ✅ Quelle: HFL AI:29 S.347."},
+  hildamariaa:  {n:"Hilda Maria Andersson",    b:"19.11.1868", s:"F",c:"sv", fi:"andersandersson", mi:"heddasofia",
+                 desc:"Hilda Maria Andersson, *19.11.1868 Mjölby. Dotter till Anders Andersson och Hedda Sofia Nilsdotter. ✅ Dopbok CI:4 bild 32 sid 51 rad 52 + HFL AI:29 sid.347.",
+                 desc_de:"Hilda Maria Andersson, *19.11.1868 Mjölby. Tochter von Anders Andersson und Hedda Sofia Nilsdotter. ✅ Taufbuch CI:4 Bild 32 + HFL AI:29 S.347."},
+  fransjohana:  {n:"Frans Johan Andersson",    b:"1871", s:"M",c:"sv", fi:"andersandersson", mi:"heddasofia",
+                 desc:"Frans Johan Andersson, *1871 Mjölby. Son till Anders Andersson och Hedda Sofia Nilsdotter. ✅ HFL AI:29 sid.347.",
+                 desc_de:"Frans Johan Andersson, *1871 Mjölby. Sohn von Anders Andersson und Hedda Sofia Nilsdotter. ✅ Quelle: HFL AI:29 S.347."},
+  augustaa:     {n:"Augusta Andersson",        b:null,   s:"F",c:"sv", fi:"andersandersson", mi:"heddasofia",
+                 desc:"Augusta Andersson, födelseår okänt. Dotter till Anders Andersson och Hedda Sofia Nilsdotter. 📷 Ateljeporträtt finns, fotograf Klara Rosendahl, Mjölby. Baksida: 'Augusta Andersson / August Linders syster'. ✅ Primärkälla.",
+                 desc_de:"Augusta Andersson, Geburtsjahr unbekannt. Tochter von Anders Andersson und Hedda Sofia Nilsdotter. 📷 Atelierporträt vorhanden, Fotograf Klara Rosendahl, Mjölby. Rückseite: 'Augusta Andersson / August Linders syster'. ✅ Primärquelle."},
+
+  // ── Nils Månssons övriga barn (utöver annabn) ──
+  lenakajsam:   {n:"Lena Kajsa Månsdotter",    b:"1803", s:"F",c:"sv", fi:"nilsmans", mi:"britahel",
+                 desc:"Lena Kajsa Månsdotter, *1803 Åsbo. Dotter till Nils Månsson och Brita Helena Larsdotter. Källa: Linder-pärmens Nr 10 ✅.",
+                 desc_de:"Lena Kajsa Månsdotter, *1803 Åsbo. Tochter von Nils Månsson und Brita Helena Larsdotter. Quelle: Nr. 10 im Linder-Ordner ✅."},
+  majalisam:    {n:"Maja Lisa Månsdotter",      b:"1806", s:"F",c:"sv", fi:"nilsmans", mi:"britahel",
+                 desc:"Maja Lisa Månsdotter, *1806 Åsbo. Dotter till Nils Månsson och Brita Helena Larsdotter. Källa: Linder-pärmens Nr 10 ✅.",
+                 desc_de:"Maja Lisa Månsdotter, *1806 Åsbo. Tochter von Nils Månsson und Brita Helena Larsdotter. Quelle: Nr. 10 im Linder-Ordner ✅."},
+  svenm:        {n:"Sven Månsson",              b:"1810", s:"M",c:"sv", fi:"nilsmans", mi:"britahel",
+                 desc:"Sven Månsson, *1810 Åsbo. Son till Nils Månsson och Brita Helena Larsdotter. Källa: Linder-pärmens Nr 10 ✅.",
+                 desc_de:"Sven Månsson, *1810 Åsbo. Sohn von Nils Månsson und Brita Helena Larsdotter. Quelle: Nr. 10 im Linder-Ordner ✅."},
+
+  // ── Alfred Bergmans övriga barn (utöver elsa) ──
+  hjalmarbg:    {n:"Hjalmar Werner Bergman",   b:"1887", s:"M",c:"svb", fi:"alfred", mi:"amanda",
+                 desc:"Hjalmar Werner Bergman, *1887 Lysekil. Son till Alfred Bergman och Amanda Strömberg. ✅ Riksarkivet folkräkningar.",
+                 desc_de:"Hjalmar Werner Bergman, *1887 Lysekil. Sohn von Alfred Bergman und Amanda Strömberg. ✅ Riksarkivet Volkszählungen."},
+  klarakbg:     {n:"Klara Konstantia Bergman", b:"1888", s:"F",c:"svb", fi:"alfred", mi:"amanda",
+                 desc:"Klara Konstantia Bergman, *1888 Brastad. Dotter till Alfred Bergman och Amanda Strömberg. ✅ Riksarkivet folkräkningar.",
+                 desc_de:"Klara Konstantia Bergman, *1888 Brastad. Tochter von Alfred Bergman und Amanda Strömberg. ✅ Riksarkivet Volkszählungen."},
+  arturbg:      {n:"Artur Bergman",            b:"1892", s:"M",c:"svb", fi:"alfred", mi:"amanda",
+                 desc:"Artur Bergman, *1892 Lyse. Son till Alfred Bergman och Amanda Strömberg. ✅ Riksarkivet folkräkningar.",
+                 desc_de:"Artur Bergman, *1892 Lyse. Sohn von Alfred Bergman und Amanda Strömberg. ✅ Riksarkivet Volkszählungen."},
+  gurlibg:      {n:"Gurli Alfhild Bergman",    b:"1894", s:"F",c:"svb", fi:"alfred", mi:"amanda",
+                 desc:"Gurli Alfhild Bergman, *1894 Lyse. Dotter till Alfred Bergman och Amanda Strömberg. ✅ Riksarkivet folkräkningar.",
+                 desc_de:"Gurli Alfhild Bergman, *1894 Lyse. Tochter von Alfred Bergman und Amanda Strömberg. ✅ Riksarkivet Volkszählungen."},
+  sixtenbg:     {n:"Sixten Folke Bergman",     b:"1896", s:"M",c:"svb", fi:"alfred", mi:"amanda",
+                 desc:"Sixten Folke Bergman, *1896 Lyse. Son till Alfred Bergman och Amanda Strömberg. ✅ Riksarkivet folkräkningar.",
+                 desc_de:"Sixten Folke Bergman, *1896 Lyse. Sohn von Alfred Bergman und Amanda Strömberg. ✅ Riksarkivet Volkszählungen."},
+  annajuditbg:  {n:"Anna Judit Bergman",       b:"1899", s:"F",c:"svb", fi:"alfred", mi:"amanda",
+                 desc:"Anna Judit Bergman, *1899 Lyse. Dotter till Alfred Bergman och Amanda Strömberg. ✅ Riksarkivet folkräkningar.",
+                 desc_de:"Anna Judit Bergman, *1899 Lyse. Tochter von Alfred Bergman und Amanda Strömberg. ✅ Riksarkivet Volkszählungen."},
+  brorsvenbg:   {n:"Bror Sven Bergman",        b:"1901", s:"M",c:"svb", fi:"alfred", mi:"amanda",
+                 desc:"Bror Sven Bergman, *1901 Lyse. Son till Alfred Bergman och Amanda Strömberg. ✅ Riksarkivet folkräkningar.",
+                 desc_de:"Bror Sven Bergman, *1901 Lyse. Sohn von Alfred Bergman und Amanda Strömberg. ✅ Riksarkivet Volkszählungen."},
+  erikabg:      {n:"Erik Alvar Bergman",       b:"1904", s:"M",c:"svb", fi:"alfred", mi:"amanda",
+                 desc:"Erik Alvar Bergman, *1904, plåttryckare. Son till Alfred Bergman och Amanda Strömberg. ✅ Riksarkivet folkräkningar.",
+                 desc_de:"Erik Alvar Bergman, *1904, Flaschner. Sohn von Alfred Bergman und Amanda Strömberg. ✅ Riksarkivet Volkszählungen."},
+  olofhbg:      {n:"Olof Hugo Bergman",        b:"1906", s:"M",c:"svb", fi:"alfred", mi:"amanda",
+                 desc:"Olof Hugo Bergman, *1906, svarvare. Son till Alfred Bergman och Amanda Strömberg. ✅ Riksarkivet folkräkningar.",
+                 desc_de:"Olof Hugo Bergman, *1906, Dreher. Sohn von Alfred Bergman und Amanda Strömberg. ✅ Riksarkivet Volkszählungen."},
+  arturosvbg:   {n:"Artur Osvald Bergman",     b:"1908", s:"M",c:"svb", fi:"alfred", mi:"amanda",
+                 desc:"Artur Osvald Bergman, *1908, smidesarbetare. Son till Alfred Bergman och Amanda Strömberg. ✅ Riksarkivet folkräkningar.",
+                 desc_de:"Artur Osvald Bergman, *1908, Schmied. Sohn von Alfred Bergman und Amanda Strömberg. ✅ Riksarkivet Volkszählungen."},
+  knutabg:      {n:"Knut Alfred Bergman",      b:"1910", s:"M",c:"svb", fi:"alfred", mi:"amanda",
+                 desc:"Knut Alfred Bergman, *1910. Son till Alfred Bergman och Amanda Strömberg. ✅ Riksarkivet folkräkningar.",
+                 desc_de:"Knut Alfred Bergman, *1910. Sohn von Alfred Bergman und Amanda Strömberg. ✅ Riksarkivet Volkszählungen."},
 };
 Object.keys(P).forEach(id => P[id].id = id);
 
@@ -683,8 +779,7 @@ function renderDetail(id) {
 
   // Fotolänk till Google Photos (visas bara för godkända)
   if (approved) {
-    const searchUrl = 'https://photos.google.com/search/' + encodeURIComponent(id);
-    html += `<div class="det-section"><a class="photos-link" href="${searchUrl}" target="_blank" rel="noopener">📷 Se foton i Google Photos</a></div>`;
+    html += `<div class="det-section"><button class="photos-link" onclick="openPhotoSearch('${id}')">📷 Se foton i Google Photos</button></div>`;
   }
 
   html += '</div>'; // det-body
@@ -730,6 +825,36 @@ backBtn.addEventListener('click', () => {
   renderDetail(prev);
   backBtn.disabled = hist.length === 0;
 });
+
+function goHome() {
+  if (currentRoot === 'lasse' && !hist.length) return;
+  hist.length = 0;
+  currentRoot = 'lasse';
+  render('lasse');
+  renderDetail('lasse');
+  backBtn.disabled = true;
+}
+
+// ════ TOAST ════
+let toastTimer = null;
+function showToast(msg, ms = 3000) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), ms);
+}
+
+// ════ FOTO — öppna stavla-albumet och kopiera namn ════
+function openPhotoSearch(personId) {
+  const p = P[personId];
+  const name = p ? p.n : personId;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(name).catch(() => {});
+  }
+  window.open(PHOTOS_ALBUM_URL, '_blank', 'noopener');
+  showToast(`Albumet öppnas — sök på "${name}" (kopierat till urklipp)`);
+}
 
 // ════ LINE DRAWING ════
 // S-kurva (bezier) per förälder i förälderns nationalitetsfärg.
@@ -909,14 +1034,12 @@ function render(rootId) {
 
       // Fotoikon på kort (för godkända)
       if (approved) {
-        const dot = document.createElement('a');
+        const dot = document.createElement('button');
         dot.className = 'photo-dot';
         dot.textContent = '📷';
-        dot.href = 'https://photos.google.com/search/' + encodeURIComponent(id);
-        dot.target = '_blank';
-        dot.rel = 'noopener';
         dot.title = 'Se foton i Google Photos';
-        dot.addEventListener('click', e => e.stopPropagation());
+        dot.style.cssText = 'background:none;border:none;cursor:pointer;padding:0;';
+        dot.addEventListener('click', e => { e.stopPropagation(); openPhotoSearch(id); });
         card.appendChild(dot);
       }
 
@@ -1212,14 +1335,12 @@ function renderPhotoIndicators() {
   document.querySelectorAll('.card[data-id]').forEach(card => {
     if (card.querySelector('.photo-dot')) return;
     const id = card.dataset.id;
-    const dot = document.createElement('a');
+    const dot = document.createElement('button');
     dot.className = 'photo-dot';
     dot.textContent = '📷';
-    dot.href = 'https://photos.google.com/search/' + encodeURIComponent(id);
-    dot.target = '_blank';
-    dot.rel = 'noopener';
     dot.title = 'Se foton i Google Photos';
-    dot.addEventListener('click', e => e.stopPropagation());
+    dot.style.cssText = 'background:none;border:none;cursor:pointer;padding:0;';
+    dot.addEventListener('click', e => { e.stopPropagation(); openPhotoSearch(id); });
     card.appendChild(dot);
   });
 }
