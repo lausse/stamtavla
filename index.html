@@ -964,6 +964,48 @@ function render(rootId) {
       });
     }
 
+    // Pass 2: nudge each family pair UP to center on its linked child.
+    // Goes youngest→oldest so grandparents benefit from already-nudged parents.
+    for (let g = 1; g < slots.length; g++) {
+      let prevBot = -Infinity;
+      const nSlots = slots[g].length;
+      for (let k = 0; k * 2 < nSlots; k++) {
+        const fId = slots[g][2*k]   || null;
+        const mId = slots[g][2*k+1] || null;
+        if (!fId && !mId) continue;
+
+        const childId = (slots[g-1] && k < slots[g-1].length) ? slots[g-1][k] : null;
+        const fCard = fId ? wrap.querySelector(`.card[data-id="${fId}"]`) : null;
+        const mCard = mId ? wrap.querySelector(`.card[data-id="${mId}"]`) : null;
+        const fH = fCard ? fCard.offsetHeight : 0;
+        const mH = mCard ? mCard.offsetHeight : 0;
+        const fCur = (fId && pos[fId]) ? pos[fId].y : null;
+        const mCur = (mId && pos[mId]) ? pos[mId].y : null;
+
+        const pairMid = fCur !== null && mCur !== null ? (fCur + mCur) / 2
+                      : fCur !== null ? fCur : mCur;
+        if (pairMid === null) continue;
+
+        const childY = (childId && pos[childId]) ? pos[childId].y : pairMid;
+        let shift = Math.min(0, childY - pairMid); // only upward
+
+        // Clamp: topmost card in pair can't go above prevBot
+        const topCur = fCur ?? mCur;
+        const topH   = fCur !== null ? fH : mH;
+        const topMin = prevBot + GAP + topH / 2;
+        if (topCur + shift < topMin) shift = topMin - topCur;
+        shift = Math.min(0, shift); // never push down
+
+        if (shift < 0) {
+          if (fId && fCard && fCur !== null) { pos[fId].y += shift; fCard.style.top = pos[fId].y + 'px'; }
+          if (mId && mCard && mCur !== null) { pos[mId].y += shift; mCard.style.top = pos[mId].y + 'px'; }
+        }
+
+        if      (mId && pos[mId]) prevBot = pos[mId].y + mH / 2;
+        else if (fId && pos[fId]) prevBot = pos[fId].y + fH / 2;
+      }
+    }
+
     // Expand canvas/wrap if cards were pushed below the original bounds
     let maxBot = 0;
     wrap.querySelectorAll('.card').forEach(c => {
