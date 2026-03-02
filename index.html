@@ -940,8 +940,8 @@ function render(rootId) {
       }
       // Fix overlaps top→bottom within this column.
       // Extra FAMILY_SEP gap between different families (varje par far+mor = en familj).
-      const FAMILY_SEP_SAME  = 50;   // gap mellan familjer av samma nationalitet
-      const FAMILY_SEP_DIFF  = 120;  // extra stort gap när nationalitet byter
+      const FAMILY_SEP_SAME  = 4;    // minimal gap — linjer hålls isär av staggerade bx
+      const FAMILY_SEP_DIFF  = 12;   // lite mer luft vid nationsskifte
       let prevBot = -Infinity;
       let prevFamilyGroup = -1;
       let prevColor = '';
