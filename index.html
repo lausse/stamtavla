@@ -964,8 +964,9 @@ function render(rootId) {
       });
     }
 
-    // Pass 2: nudge each family pair UP to center on its linked child.
-    // Goes youngest→oldest so grandparents benefit from already-nudged parents.
+    // Pass 2: center each family pair on its linked child (both up AND down).
+    // Processes youngest→oldest, top→bottom within each column.
+    // Pairs are shifted as a unit; only constraint is "don't go above previous pair".
     for (let g = 1; g < slots.length; g++) {
       let prevBot = -Infinity;
       const nSlots = slots[g].length;
@@ -987,16 +988,15 @@ function render(rootId) {
         if (pairMid === null) continue;
 
         const childY = (childId && pos[childId]) ? pos[childId].y : pairMid;
-        let shift = Math.min(0, childY - pairMid); // only upward
+        let shift = childY - pairMid; // positive = down, negative = up
 
-        // Clamp: topmost card in pair can't go above prevBot
+        // Clamp: topmost card in pair can't go above the previous pair's bottom
         const topCur = fCur ?? mCur;
         const topH   = fCur !== null ? fH : mH;
         const topMin = prevBot + GAP + topH / 2;
         if (topCur + shift < topMin) shift = topMin - topCur;
-        shift = Math.min(0, shift); // never push down
 
-        if (shift < 0) {
+        if (Math.abs(shift) > 0.5) {
           if (fId && fCard && fCur !== null) { pos[fId].y += shift; fCard.style.top = pos[fId].y + 'px'; }
           if (mId && mCard && mCur !== null) { pos[mId].y += shift; mCard.style.top = pos[mId].y + 'px'; }
         }
