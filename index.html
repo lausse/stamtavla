@@ -652,12 +652,19 @@ const LEAF_H  = 46;   // px per leaf slot
 const MAX_G   = 9;    // max generations (öka vid behov)
 
 // ════ HELPERS ════
+// Extraherar ett sorterbart år ur b-fältet ("23.2.1865" → 1865, "ca 1841" → 1841, null → 9999)
+function birthYear(p) {
+  if (!p.b) return 9999;
+  const m = p.b.match(/\d{4}/);
+  return m ? parseInt(m[0], 10) : 9999;
+}
+
 function getSibs(id) {
   const p = P[id];
   return Object.values(P).filter(o =>
     o.id !== id &&
     ((p.fi && o.fi === p.fi) || (p.mi && o.mi === p.mi))
-  );
+  ).sort((a, b) => birthYear(a) - birthYear(b));
 }
 
 function buildSlots(rootId) {
@@ -690,7 +697,8 @@ const COLORS = {
 };
 
 function getChildren(id) {
-  return Object.values(P).filter(o => o.fi === id || o.mi === id);
+  return Object.values(P).filter(o => o.fi === id || o.mi === id)
+               .sort((a, b) => birthYear(a) - birthYear(b));
 }
 
 function getSpouses(id) {
