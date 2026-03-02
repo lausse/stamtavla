@@ -930,21 +930,27 @@ function render(rootId) {
       }
       // Fix overlaps top→bottom within this column.
       // Extra FAMILY_SEP gap between different families (varje par far+mor = en familj).
-      const FAMILY_SEP = 50;
+      const FAMILY_SEP_SAME  = 50;   // gap mellan familjer av samma nationalitet
+      const FAMILY_SEP_DIFF  = 120;  // extra stort gap när nationalitet byter
       let prevBot = -Infinity;
       let prevFamilyGroup = -1;
+      let prevColor = '';
       slots[g].forEach((id, j) => {
         if (!id || !pos[id]) return;
         const card = wrap.querySelector(`.card[data-id="${id}"]`);
         if (!card) return;
         const h = card.offsetHeight;
         const familyGroup = Math.floor(j / 2);
-        const extraGap = (familyGroup > prevFamilyGroup && prevFamilyGroup >= 0) ? FAMILY_SEP : 0;
+        const curColor = P[id]?.c || '';
+        const colorChanged = prevColor && curColor && prevColor !== curColor;
+        const sep = colorChanged ? FAMILY_SEP_DIFF : FAMILY_SEP_SAME;
+        const extraGap = (familyGroup > prevFamilyGroup && prevFamilyGroup >= 0) ? sep : 0;
         const minY = prevBot + GAP + extraGap + h / 2;
         if (pos[id].y < minY) pos[id].y = minY;
         card.style.top = pos[id].y + 'px';
         prevBot = pos[id].y + h / 2;
         prevFamilyGroup = familyGroup;
+        prevColor = curColor;
       });
     }
 
