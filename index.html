@@ -173,13 +173,13 @@ body.lang-de .barn::before { content: 'Kinder: '; }
 #sign-out-btn { background:none; border:none; font-size:11px; color:#ccc; cursor:pointer; padding:0 0 0 4px; }
 #sign-out-btn:hover { color: #e06060; }
 
-/* ── Fotopunkt på kort ── */
+/* ── Fotoikon på kort ── */
 .photo-dot {
-  position: absolute; top: 5px; right: 6px;
-  width: 7px; height: 7px; border-radius: 50%;
-  background: #4a90d9; box-shadow: 0 0 0 1.5px white;
-  pointer-events: none;
+  position: absolute; top: 3px; right: 5px;
+  font-size: 11px; line-height: 1;
+  text-decoration: none; opacity: .65;
 }
+.photo-dot:hover { opacity: 1; }
 
 /* ── Ansökningsmodal ── */
 #apply-modal {
@@ -217,22 +217,15 @@ body.lang-de .barn::before { content: 'Kinder: '; }
 #gsi-btn-container { display: flex; justify-content: center; margin-top: 12px; }
 .apply-success-icon { font-size: 36px; text-align:center; margin: 10px 0; }
 
-/* ── Foton i detaljpanelen ── */
-.det-photos { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px; }
-.det-photo {
-  width: 100%; aspect-ratio: 1; object-fit: cover;
-  border-radius: 8px; cursor: zoom-in;
-  transition: opacity .12s, transform .12s;
+/* ── Fotolänk i detaljpanelen ── */
+.photos-link {
+  display: inline-block; margin-top: 6px;
+  padding: 6px 12px; border-radius: 8px;
+  background: #2a2a2a; color: #ccc;
+  font-size: 13px; text-decoration: none;
+  transition: background .15s, color .15s;
 }
-.det-photo:hover { opacity: .88; transform: scale(1.02); }
-
-/* ── Lightbox ── */
-#lightbox {
-  position: fixed; inset: 0; background: rgba(0,0,0,.92);
-  z-index: 200; display: none; align-items: center; justify-content: center;
-  cursor: zoom-out;
-}
-#lightbox img { max-width: 92vw; max-height: 88vh; border-radius: 10px; object-fit: contain; }
+.photos-link:hover { background: #3a3a3a; color: #fff; }
 </style>
 </head>
 <body class="lang-sv">
@@ -316,10 +309,7 @@ body.lang-de .barn::before { content: 'Kinder: '; }
   </div>
 </div>
 
-<!-- ── Lightbox ── -->
-<div id="lightbox" onclick="this.style.display='none'">
-  <img id="lightbox-img" src="" alt="">
-</div>
+
 
 <div id="zoom-controls">
   <button class="zoom-btn" id="zoom-in">+</button>
@@ -668,15 +658,10 @@ function renderDetail(id) {
     html += `<div class="det-section"><h4>${t.detNote}</h4><div class="det-note">${p.x}</div></div>`;
   }
 
-  // Foton (visas bara för inloggade + godkända)
-  if (approved && photoMap[id]?.length > 0) {
-    html += `<div class="det-section"><h4>Foton</h4><div class="det-photos">`;
-    photoMap[id].forEach(url => {
-      const safeUrl = url.replace(/'/g, '%27');
-      html += `<img class="det-photo" src="${safeUrl}" alt="" loading="lazy"
-                    onclick="openLightbox('${safeUrl}')">`;
-    });
-    html += `</div></div>`;
+  // Fotolänk till Google Photos (visas bara för godkända)
+  if (approved) {
+    const searchUrl = 'https://photos.google.com/search/' + encodeURIComponent(id);
+    html += `<div class="det-section"><a class="photos-link" href="${searchUrl}" target="_blank" rel="noopener">📷 Se foton i Google Photos</a></div>`;
   }
 
   html += '</div>'; // det-body
@@ -901,10 +886,16 @@ function render(rootId) {
         });
       }
 
-      // Fotopunkt om bilder finns för denna person
-      if (approved && photoMap[id]?.length > 0) {
-        const dot = document.createElement('div');
+      // Fotoikon på kort (för godkända)
+      if (approved) {
+        const dot = document.createElement('a');
         dot.className = 'photo-dot';
+        dot.textContent = '📷';
+        dot.href = 'https://photos.google.com/search/' + encodeURIComponent(id);
+        dot.target = '_blank';
+        dot.rel = 'noopener';
+        dot.title = 'Se foton i Google Photos';
+        dot.addEventListener('click', e => e.stopPropagation());
         card.appendChild(dot);
       }
 
@@ -1082,10 +1073,9 @@ document.querySelectorAll('.lang-btn').forEach(btn =>
 // ════════════════════════════════════════════════════════
 const GOOG_CLIENT_ID  = '954461686218-bh0238cc4ddd2eld8ju6dqb5350qaomp.apps.googleusercontent.com';
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwgRXCv0_UmjFfLb8mVb4fH_Ei_ikcD5sWXUIza82SiZM8oTZkBNnXeTCiradJkdozcHQ/exec';
-const PHOTOS_JSON_URL = 'https://raw.githubusercontent.com/lausse/stamtavla/main/photos.json';
+const PHOTOS_ALBUM_URL = 'https://photos.app.goo.gl/taPU3v54CCnBHVX97';
 
-// ════ FOTO-STATE ════
-let photoMap = {};    // { personId: ['url1', 'url2', ...] }
+// ════ AUTH STATE ════
 let authUser = null;  // { email, name, picture }
 let approved  = false;
 let gsiReady  = false;
@@ -1127,7 +1117,6 @@ window.handleCredentialResponse = async function(response) {
 
   if (approved) {
     closeApplyModal();
-    await loadPhotos();
     renderPhotoIndicators();
     renderDetail(currentRoot);
   } else {
@@ -1143,30 +1132,26 @@ function signOut() {
   if (typeof google !== 'undefined') google.accounts.id.disableAutoSelect();
   authUser = null;
   approved  = false;
-  photoMap  = {};
   document.getElementById('user-chip').style.display = 'none';
   document.getElementById('auth-open-btn').style.display = '';
   document.querySelectorAll('.photo-dot').forEach(d => d.remove());
   renderDetail(currentRoot);
 }
 
-// ════ HÄMTA PHOTOS.JSON ════
-async function loadPhotos() {
-  try {
-    const r = await fetch(PHOTOS_JSON_URL + '?_=' + Date.now());
-    photoMap = await r.json();
-  } catch(e) { photoMap = {}; }
-}
-
-// ════ VISA FOTOPUNKTER PÅ KORTEN ════
+// ════ VISA FOTOIKONER PÅ KORTEN ════
 function renderPhotoIndicators() {
   document.querySelectorAll('.card[data-id]').forEach(card => {
+    if (card.querySelector('.photo-dot')) return;
     const id = card.dataset.id;
-    if (photoMap[id]?.length > 0 && !card.querySelector('.photo-dot')) {
-      const dot = document.createElement('div');
-      dot.className = 'photo-dot';
-      card.appendChild(dot);
-    }
+    const dot = document.createElement('a');
+    dot.className = 'photo-dot';
+    dot.textContent = '📷';
+    dot.href = 'https://photos.google.com/search/' + encodeURIComponent(id);
+    dot.target = '_blank';
+    dot.rel = 'noopener';
+    dot.title = 'Se foton i Google Photos';
+    dot.addEventListener('click', e => e.stopPropagation());
+    card.appendChild(dot);
   });
 }
 
@@ -1244,11 +1229,7 @@ async function submitApplication() {
   }
 }
 
-// ════ LIGHTBOX ════
-function openLightbox(url) {
-  document.getElementById('lightbox-img').src = url;
-  document.getElementById('lightbox').style.display = 'flex';
-}
+
 
 // Stäng modal vid klick utanför rutan
 document.getElementById('apply-modal').addEventListener('click', function(e) {
