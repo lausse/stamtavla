@@ -30,7 +30,7 @@ canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
 
 /* ── Card ── */
 .card {
-  position: absolute; display: flex; align-items: flex-start; gap: 5px;
+  position: absolute; display: flex; flex-direction: column;
   padding: 5px 8px 5px 6px; border-radius: 14px; border: 2px solid;
   width: 168px; transform: translateY(-50%);
   background: white; cursor: pointer;
@@ -39,6 +39,7 @@ canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
 .card:hover { filter: brightness(.96); box-shadow: 0 3px 12px rgba(0,0,0,.14); z-index: 5; }
 .card.focused { box-shadow: 0 0 0 3px rgba(100,80,200,.35); z-index: 6; cursor: default; }
 
+.card-top { display: flex; align-items: flex-start; gap: 5px; }
 .av { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; color: white; margin-top: 1px; }
 
 .info { flex: 1; min-width: 0; }
@@ -46,7 +47,7 @@ canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
 .dt { font-size: 9.5px; color: #888; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .note { font-size: 9px; color: #aaa; font-style: italic; }
 
-.sibs { margin-top: 5px; padding-top: 4px; border-top: 1px solid rgba(0,0,0,.07); display: flex; align-items: flex-start; gap: 4px; }
+.sibs { margin-top: 5px; padding-top: 4px; border-top: 1px solid rgba(0,0,0,.07); display: flex; align-items: flex-start; gap: 5px; }
 .sib { font-size: 10px; padding: 2px 7px; border-radius: 10px; border: 1px solid; cursor: pointer; white-space: nowrap; transition: filter .1s; background: white; }
 .sib:hover { filter: brightness(.92); }
 
@@ -67,8 +68,8 @@ canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
 .sib-mix { border-color: #9060d0; color: #503090; }
 .sib-unk { border-color: #bbb;    color: #888;    }
 .barn { margin-top: 4px; padding-top: 4px; border-top: 1px dashed rgba(0,0,0,.1);
-        display: flex; align-items: flex-start; gap: 4px; }
-.section-lbl { font-size: 10px; font-weight: 700; color: #ccc; white-space: nowrap; flex-shrink: 0; padding-top: 3px; }
+        display: flex; align-items: flex-start; gap: 5px; }
+.section-lbl { font-size: 10px; font-weight: 700; color: #ccc; white-space: nowrap; flex-shrink: 0; width: 28px; text-align: right; padding-top: 3px; }
 .chips { display: flex; flex-wrap: wrap; gap: 3px; }
 
 /* Language toggle */
@@ -1320,11 +1321,13 @@ function render(rootId) {
       card.style.left = pos_p.x + 'px';
       card.style.top  = pos_p.y + 'px';
 
-      // Avatar
+      // Top row: avatar + info
+      const cardTop = document.createElement('div');
+      cardTop.className = 'card-top';
       const av = document.createElement('div');
       av.className = 'av';
       av.textContent = p.s === 'F' ? '♀' : '♂';
-      card.appendChild(av);
+      cardTop.appendChild(av);
 
       // Info block
       const info = document.createElement('div');
@@ -1347,8 +1350,9 @@ function render(rootId) {
       info.appendChild(dt);
 
       // Sibling chips
+      let sibsDiv = null;
       if (sibs.length > 0) {
-        const sibsDiv = document.createElement('div');
+        sibsDiv = document.createElement('div');
         sibsDiv.className = 'sibs';
         const sibsLbl = document.createElement('span');
         sibsLbl.className = 'section-lbl';
@@ -1370,13 +1374,13 @@ function render(rootId) {
           sibsChips.appendChild(btn);
         });
         sibsDiv.appendChild(sibsChips);
-        info.appendChild(sibsDiv);
       }
 
       // Children chips
       const children = getChildren(id);
+      let barnDiv = null;
       if (children.length > 0) {
-        const barnDiv = document.createElement('div');
+        barnDiv = document.createElement('div');
         barnDiv.className = 'barn';
         const barnLbl = document.createElement('span');
         barnLbl.className = 'section-lbl';
@@ -1398,10 +1402,12 @@ function render(rootId) {
           barnChips.appendChild(btn);
         });
         barnDiv.appendChild(barnChips);
-        info.appendChild(barnDiv);
       }
 
-      card.appendChild(info);
+      cardTop.appendChild(info);
+      card.appendChild(cardTop);
+      if (sibs.length > 0) card.appendChild(sibsDiv);
+      if (barnDiv) card.appendChild(barnDiv);
 
       // Click on card itself = focus, or re-open panel if already focused
       if (!isFocus) {
