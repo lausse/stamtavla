@@ -173,6 +173,22 @@ body.lang-de .barn::before { content: 'Kinder: '; }
 #sign-out-btn { background:none; border:none; font-size:11px; color:#ccc; cursor:pointer; padding:0 0 0 4px; }
 #sign-out-btn:hover { color: #e06060; }
 
+/* ── Admin-fotolista i detaljpanelen ── */
+.det-photo-row {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 4px;
+}
+.det-photo-lnk {
+  flex: 1; font-size: 12px; color: #5ab6e0; text-decoration: none;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.det-photo-lnk:hover { text-decoration: underline; }
+.det-photo-del {
+  background: none; border: none; color: #ccc; cursor: pointer;
+  font-size: 13px; padding: 0 2px; line-height: 1; flex-shrink: 0;
+}
+.det-photo-del:hover { color: #e06060; }
+.det-photo-add { margin-top: 6px; font-size: 12px; }
+
 /* ── Fotoikon på kort ── */
 .photo-dot {
   position: absolute; top: 3px; right: 5px;
@@ -982,8 +998,29 @@ function renderDetail(id) {
     html += `<div class="det-section"><h4>${t.detNote}</h4><div class="det-note">${p.x}</div></div>`;
   }
 
-  // Fotolänk till Google Photos (visas bara för godkända)
-  if (approved) {
+  // Fotosektion
+  if (isAdmin) {
+    // ── Admin: hantera foton direkt i panelen ──
+    const items = PHOTOS[id] || [];
+    html += `<div class="det-section" id="det-photo-admin">
+      <h4>Foton</h4>
+      <div id="det-photo-list">`;
+    if (items.length === 0) {
+      html += `<div class="det-note" style="margin-bottom:6px">Inga foton kopplade ännu.</div>`;
+    } else {
+      items.forEach((item, idx) => {
+        const url   = typeof item === 'string' ? item : item.url;
+        const label = typeof item === 'string' ? `Foto ${idx + 1}` : (item.text || `Foto ${idx + 1}`);
+        html += `<div class="det-photo-row">
+          <a class="det-photo-lnk" href="${url}" target="_blank" rel="noopener">📷 ${label}</a>
+          <button class="det-photo-del" onclick="deleteAdminPhoto('${id}',${idx})" title="Ta bort">✕</button>
+        </div>`;
+      });
+    }
+    html += `</div>
+      <button class="det-link det-photo-add" onclick="showAddPhotoForm('${id}')">＋ Lägg till foto</button>
+    </div>`;
+  } else if (approved) {
     html += `<div class="det-section"><button class="photos-link" onclick="openPhotoSearch('${id}')">📷 Se foton i Google Photos</button></div>`;
   }
 
@@ -1048,12 +1085,21 @@ function showToast(msg, ms = 3000) {
   toastTimer = setTimeout(() => el.classList.remove('show'), ms);
 }
 
-// ════ FOTO — photos.json (personId → array av URL/objekt) ════
+// ════ FOTO — laddas från Apps Script (Sheet) med fallback till photos.json ════
 let PHOTOS = {};
-fetch('photos.json')
-  .then(r => r.json())
-  .then(d => { PHOTOS = d; })
-  .catch(() => {});
+
+async function loadPhotos() {
+  try {
+    const r = await fetch(`${APPS_SCRIPT_URL}?action=get_photos`);
+    const d = await r.json();
+    if (d && typeof d === 'object' && !d.error) { PHOTOS = d; return; }
+  } catch(e) {}
+  try {
+    const r = await fetch('photos.json');
+    PHOTOS = await r.json();
+  } catch(e) {}
+}
+loadPhotos();
 
 function openPhotoSearch(personId) {
   const p     = P[personId];
@@ -1098,6 +1144,71 @@ function closePhotoModal() {
 document.getElementById('photo-modal').addEventListener('click', function(e) {
   if (e.target === this) closePhotoModal();
 });
+
+// ════ ADMIN — fotolänkar per person ════
+function showAddPhotoForm(personId) {
+  const admin = document.getElementById('det-photo-admin');
+  if (!admin) return;
+  admin.querySelector('.det-photo-add').style.display = 'none';
+  const form = document.createElement('div');
+  form.id = 'add-photo-form';
+  form.style.marginTop = '8px';
+  form.innerHTML = `
+    <div class="apply-field" style="margin-bottom:7px">
+      <label>Foto-URL (klistra in från Google Photos)</label>
+      <input id="new-photo-url" type="url" placeholder="https://photos.google.com/photo/…">
+    </div>
+    <div class="apply-field" style="margin-bottom:8px">
+      <label>Bildtext (valfri)</label>
+      <input id="new-photo-text" type="text" placeholder="T.ex. Deportationshandling 1945">
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="det-link" style="background:#5ab6e0;color:#fff;border-color:#5ab6e0"
+              onclick="saveAdminPhoto('${personId}')">Spara</button>
+      <button class="det-link" onclick="renderDetail('${personId}')">Avbryt</button>
+    </div>
+    <div id="add-photo-status" style="font-size:11px;margin-top:6px;min-height:16px"></div>`;
+  admin.appendChild(form);
+  document.getElementById('new-photo-url').focus();
+}
+
+async function saveAdminPhoto(personId) {
+  const url    = (document.getElementById('new-photo-url').value || '').trim();
+  const text   = (document.getElementById('new-photo-text').value || '').trim();
+  const status = document.getElementById('add-photo-status');
+  if (!url) { status.textContent = 'Klistra in en URL.'; status.style.color = '#e06060'; return; }
+
+  status.textContent = 'Sparar…'; status.style.color = '#888';
+  try {
+    const r = await fetch(
+      `${APPS_SCRIPT_URL}?action=save_photo&personId=${encodeURIComponent(personId)}`
+      + `&url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`
+      + `&token=${encodeURIComponent(authToken)}`
+    );
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Okänt fel');
+    if (!PHOTOS[personId]) PHOTOS[personId] = [];
+    PHOTOS[personId].push(text ? {url, text} : url);
+    showToast(`📷 Foto sparat`);
+    renderDetail(personId);
+  } catch(e) {
+    status.textContent = `Fel: ${e.message}`; status.style.color = '#e06060';
+  }
+}
+
+async function deleteAdminPhoto(personId, idx) {
+  try {
+    const r = await fetch(
+      `${APPS_SCRIPT_URL}?action=delete_photo&personId=${encodeURIComponent(personId)}`
+      + `&idx=${idx}&token=${encodeURIComponent(authToken)}`
+    );
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Okänt fel');
+    if (PHOTOS[personId]) PHOTOS[personId].splice(idx, 1);
+    showToast('Foto borttaget');
+    renderDetail(personId);
+  } catch(e) { showToast(`Fel: ${e.message}`); }
+}
 
 // ════ LINE DRAWING ════
 // S-kurva (bezier) per förälder i förälderns nationalitetsfärg.
@@ -1529,6 +1640,7 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwgRXCv0_UmjFfL
 let authUser  = null;  // { email, name, picture }
 let authToken = null;  // Google ID-token (för API-anrop)
 let approved  = false;
+let isAdmin   = false;
 let gsiReady  = false;
 const LASSE_EMAIL_CLIENT = 'lausse@gmail.com';
 
@@ -1569,10 +1681,11 @@ window.handleCredentialResponse = async function(response) {
   } catch(e) { approved = false; }
 
   if (approved) {
+    isAdmin = authUser.email.toLowerCase() === LASSE_EMAIL_CLIENT;
     closeApplyModal();
     renderPhotoIndicators();
     renderDetail(currentRoot);
-    if (authUser.email.toLowerCase() === LASSE_EMAIL_CLIENT)
+    if (isAdmin)
       document.getElementById('admin-btn').style.display = '';
   } else {
     // Inloggad men ej godkänd: visa ansökningsformuläret (med namn förifyllt från Google)
@@ -1591,6 +1704,7 @@ function signOut() {
   authUser  = null;
   authToken = null;
   approved  = false;
+  isAdmin   = false;
   document.getElementById('user-chip').style.display = 'none';
   document.getElementById('auth-open-btn').style.display = '';
   document.getElementById('admin-btn').style.display = 'none';
