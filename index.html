@@ -1011,11 +1011,9 @@ function showToast(msg, ms = 3000) {
 function openPhotoSearch(personId) {
   const p = P[personId];
   const name = p ? p.n : personId;
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(name).catch(() => {});
-  }
-  window.open(PHOTOS_ALBUM_URL, '_blank', 'noopener');
-  showToast(`Albumet öppnas — sök på "${name}" (kopierat till urklipp)`);
+  const url = 'https://photos.google.com/search/' + encodeURIComponent(name);
+  window.open(url, '_blank', 'noopener');
+  showToast(`Söker efter "${name}" i Google Photos`);
 }
 
 // ════ LINE DRAWING ════
