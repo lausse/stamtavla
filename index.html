@@ -46,10 +46,7 @@ canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
 .dt { font-size: 9.5px; color: #888; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .note { font-size: 9px; color: #aaa; font-style: italic; }
 
-.sibs { margin-top: 5px; padding-top: 4px; border-top: 1px solid rgba(0,0,0,.07); display: flex; flex-wrap: wrap; gap: 3px; }
-.sibs::before { font-size: 10px; font-weight: 700; color: #ccc; display: block; width: 100%; margin-bottom: 1px; }
-body.lang-sv .sibs::before { content: 'syskon: '; }
-body.lang-de .sibs::before { content: 'Geschwister: '; }
+.sibs { margin-top: 5px; padding-top: 4px; border-top: 1px solid rgba(0,0,0,.07); display: flex; align-items: flex-start; gap: 4px; }
 .sib { font-size: 10px; padding: 2px 7px; border-radius: 10px; border: 1px solid; cursor: pointer; white-space: nowrap; transition: filter .1s; background: white; }
 .sib:hover { filter: brightness(.92); }
 
@@ -70,10 +67,9 @@ body.lang-de .sibs::before { content: 'Geschwister: '; }
 .sib-mix { border-color: #9060d0; color: #503090; }
 .sib-unk { border-color: #bbb;    color: #888;    }
 .barn { margin-top: 4px; padding-top: 4px; border-top: 1px dashed rgba(0,0,0,.1);
-        display: flex; flex-wrap: wrap; gap: 3px; }
-.barn::before { font-size: 10px; font-weight: 700; color: #ccc; }
-body.lang-sv .barn::before { content: 'barn: '; }
-body.lang-de .barn::before { content: 'Kinder: '; }
+        display: flex; align-items: flex-start; gap: 4px; }
+.section-lbl { font-size: 10px; font-weight: 700; color: #ccc; white-space: nowrap; flex-shrink: 0; padding-top: 3px; }
+.chips { display: flex; flex-wrap: wrap; gap: 3px; }
 
 /* Language toggle */
 #lang-toggle { display: flex; gap: 3px; margin-left: 8px; }
@@ -1354,6 +1350,12 @@ function render(rootId) {
       if (sibs.length > 0) {
         const sibsDiv = document.createElement('div');
         sibsDiv.className = 'sibs';
+        const sibsLbl = document.createElement('span');
+        sibsLbl.className = 'section-lbl';
+        sibsLbl.textContent = lang === 'de' ? 'Geschwister:' : 'syskon:';
+        sibsDiv.appendChild(sibsLbl);
+        const sibsChips = document.createElement('div');
+        sibsChips.className = 'chips';
         sibs.forEach(s => {
           const btn = document.createElement('button');
           btn.className = 'sib sib-' + s.c;
@@ -1365,8 +1367,9 @@ function render(rootId) {
             e.stopPropagation();
             focusPerson(s.id);
           });
-          sibsDiv.appendChild(btn);
+          sibsChips.appendChild(btn);
         });
+        sibsDiv.appendChild(sibsChips);
         info.appendChild(sibsDiv);
       }
 
@@ -1375,6 +1378,12 @@ function render(rootId) {
       if (children.length > 0) {
         const barnDiv = document.createElement('div');
         barnDiv.className = 'barn';
+        const barnLbl = document.createElement('span');
+        barnLbl.className = 'section-lbl';
+        barnLbl.textContent = lang === 'de' ? 'Kinder:' : 'barn:';
+        barnDiv.appendChild(barnLbl);
+        const barnChips = document.createElement('div');
+        barnChips.className = 'chips';
         children.forEach(c => {
           const btn = document.createElement('button');
           btn.className = 'child child-' + c.c;
@@ -1386,8 +1395,9 @@ function render(rootId) {
             e.stopPropagation();
             focusPerson(c.id);
           });
-          barnDiv.appendChild(btn);
+          barnChips.appendChild(btn);
         });
+        barnDiv.appendChild(barnChips);
         info.appendChild(barnDiv);
       }
 
