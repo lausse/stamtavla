@@ -286,11 +286,99 @@ body.lang-de .barn::before { content: 'Kinder: '; }
 /* ── Stamtavla-titel klickbar ── */
 #topbar h1 { cursor: pointer; }
 #topbar h1:hover { color: #5ab6e0; }
+
+/* ── Mobile backdrop (detail panel) ── */
+#det-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.35);
+  z-index: 29;
+  display: none;
+}
+#det-backdrop.visible { display: block; }
+
+/* ════ MOBILANPASSNING ════ */
+@media (max-width: 640px) {
+
+  /* ─ Topbar ─ */
+  #topbar {
+    flex-wrap: wrap;
+    padding: 8px 12px 6px;
+    gap: 6px 10px;
+  }
+  #topbar h1 { font-size: 15px; }
+  #focus-name { order: 10; width: 100%; flex: none; font-size: 12px; padding-bottom: 2px; }
+  .hint { display: none; }
+  #lang-toggle { margin-left: 0; }
+  .lang-btn { font-size: 15px; }
+  #back { font-size: 12px; padding: 5px 10px; }
+  #auth-open-btn { font-size: 11px; padding: 4px 9px; }
+  #admin-btn { font-size: 11px; padding: 4px 8px; }
+  #auth-zone { gap: 6px; }
+  #user-name { max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ─ Detail panel — bottom sheet ─ */
+  #detail {
+    position: fixed;
+    inset: auto 0 0 0;
+    width: 100%;
+    max-height: 65vh;
+    border-left: none;
+    border-top: 1px solid #ddd;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -4px 24px rgba(0,0,0,.15);
+    z-index: 30;
+    transition: transform .3s ease;
+    transform: translateY(0);
+  }
+  #detail.collapsed {
+    width: 100%;
+    transform: translateY(110%);
+  }
+  /* Handtag-rad överst i bottom sheet */
+  #detail::before {
+    content: '';
+    display: block;
+    width: 40px; height: 4px;
+    background: #ddd; border-radius: 2px;
+    margin: 8px auto 0;
+    flex-shrink: 0;
+    align-self: center;
+  }
+  #det-close { font-size: 22px; padding: 4px 8px; }
+
+  /* ─ Zoom-knappar — större tryckyta ─ */
+  .zoom-btn { width: 46px; height: 46px; font-size: 26px; }
+  #zoom-controls { bottom: 14px; }
+
+  /* ─ Admin-panel — bottom sheet ─ */
+  #admin-modal {
+    padding-top: 10px;
+    align-items: flex-end;
+    padding-bottom: 0;
+  }
+  #admin-box {
+    border-radius: 18px 18px 0 0;
+    max-height: 85vh;
+    width: 100%;
+    max-width: 100%;
+  }
+  .admin-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+    padding: 12px 14px;
+  }
+  .admin-right { justify-content: flex-start; margin-top: 4px; }
+
+  /* ─ Ansökningsmodal ─ */
+  #apply-box { padding: 20px 16px 16px; }
+  #apply-box h2 { font-size: 15px; }
+}
 </style>
 </head>
 <body class="lang-sv">
 
 <div id="toast"></div>
+<div id="det-backdrop"></div>
 
 <!-- ── Admin-panel ── -->
 <div id="admin-modal">
@@ -770,10 +858,21 @@ function getSpouses(id) {
 }
 
 // ════ DETAIL PANEL ════
-const detPanel = document.getElementById('detail');
+const detPanel   = document.getElementById('detail');
+const detBackdrop = document.getElementById('det-backdrop');
+
+function showDetailPanel() {
+  detPanel.classList.remove('collapsed');
+  detBackdrop.classList.add('visible');
+}
+function closeDetailPanel() {
+  detPanel.classList.add('collapsed');
+  detBackdrop.classList.remove('visible');
+}
+detBackdrop.addEventListener('click', closeDetailPanel);
 
 function renderDetail(id) {
-  detPanel.classList.remove('collapsed');
+  showDetailPanel();
   if (!id || !P[id]) { detPanel.innerHTML = `<div class="det-empty">${LANG[lang].detEmpty}</div>`; return; }
   const p   = P[id];
   const col = COLORS[p.c] || '#bbb';
@@ -849,9 +948,7 @@ function renderDetail(id) {
 
   html += '</div>'; // det-body
   detPanel.innerHTML = html;
-  document.getElementById('det-close').addEventListener('click', () => {
-    detPanel.classList.add('collapsed');
-  });
+  document.getElementById('det-close').addEventListener('click', closeDetailPanel);
 }
 
 // ════ STATE ════
@@ -1092,7 +1189,6 @@ function render(rootId) {
         card.addEventListener('click', () => focusPerson(id));
       } else {
         card.addEventListener('click', () => {
-          detPanel.classList.remove('collapsed');
           renderDetail(id);
         });
       }
