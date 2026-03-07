@@ -287,6 +287,36 @@ body.lang-de .barn::before { content: 'Kinder: '; }
 #topbar h1 { cursor: pointer; }
 #topbar h1:hover { color: #5ab6e0; }
 
+/* ── Fotovisare-modal ── */
+#photo-modal {
+  position: fixed; inset: 0; background: rgba(0,0,0,.55);
+  z-index: 110; display: none; align-items: center; justify-content: center;
+}
+#photo-box {
+  background: white; border-radius: 18px;
+  max-width: 420px; width: 92%; max-height: 75vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 8px 40px rgba(0,0,0,.28); overflow: hidden;
+}
+#photo-head {
+  padding: 13px 18px; display: flex; align-items: center; gap: 10px;
+  border-bottom: 1px solid #eee; flex-shrink: 0;
+}
+#photo-head h3 { flex: 1; font-size: 13.5px; font-weight: 700; color: #222; }
+#photo-close { background: none; border: none; font-size: 17px; color: #bbb; cursor: pointer; line-height: 1; }
+#photo-close:hover { color: #555; }
+#photo-list { overflow-y: auto; }
+.photo-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 18px; text-decoration: none; color: #333;
+  border-bottom: 1px solid #f2f2f2; transition: background .1s;
+}
+.photo-item:last-child { border-bottom: none; }
+.photo-item:hover { background: #f7f7f7; }
+.photo-icon { font-size: 20px; flex-shrink: 0; }
+.photo-label { font-size: 13px; flex: 1; line-height: 1.4; }
+.photo-arrow { color: #ccc; font-size: 13px; }
+
 /* ── Mobile backdrop (detail panel) ── */
 #det-backdrop {
   position: fixed; inset: 0;
@@ -471,6 +501,17 @@ body.lang-de .barn::before { content: 'Kinder: '; }
 </div>
 
 
+
+<!-- ── Fotovisare-modal ── -->
+<div id="photo-modal">
+  <div id="photo-box">
+    <div id="photo-head">
+      <h3 id="photo-person-name"></h3>
+      <button id="photo-close" onclick="closePhotoModal()">✕</button>
+    </div>
+    <div id="photo-list"></div>
+  </div>
+</div>
 
 <div id="zoom-controls">
   <button class="zoom-btn" id="zoom-in">+</button>
@@ -1007,14 +1048,56 @@ function showToast(msg, ms = 3000) {
   toastTimer = setTimeout(() => el.classList.remove('show'), ms);
 }
 
-// ════ FOTO — öppna stavla-albumet och kopiera namn ════
+// ════ FOTO — photos.json (personId → array av URL/objekt) ════
+let PHOTOS = {};
+fetch('photos.json')
+  .then(r => r.json())
+  .then(d => { PHOTOS = d; })
+  .catch(() => {});
+
 function openPhotoSearch(personId) {
-  const p = P[personId];
-  const name = p ? p.n : personId;
-  const url = 'https://photos.google.com/search/' + encodeURIComponent(name);
-  window.open(url, '_blank', 'noopener');
-  showToast(`Söker efter "${name}" i Google Photos`);
+  const p     = P[personId];
+  const name  = p ? p.n : personId;
+  const items = PHOTOS[personId] || [];
+
+  if (!items.length) {
+    showToast(`Inga foton kopplade för ${name} ännu`);
+    return;
+  }
+
+  // En enda bild → öppna direkt
+  if (items.length === 1) {
+    const url = typeof items[0] === 'string' ? items[0] : items[0].url;
+    window.open(url, '_blank', 'noopener');
+    return;
+  }
+
+  // Flera bilder → visa modal
+  document.getElementById('photo-person-name').textContent = '📷 ' + name;
+  const list = document.getElementById('photo-list');
+  list.innerHTML = '';
+  items.forEach((item, i) => {
+    const url   = typeof item === 'string' ? item : item.url;
+    const label = typeof item === 'string' ? `Foto ${i + 1}` : (item.text || `Foto ${i + 1}`);
+    const a = document.createElement('a');
+    a.className = 'photo-item';
+    a.href      = url;
+    a.target    = '_blank';
+    a.rel       = 'noopener';
+    a.innerHTML = `<span class="photo-icon">📷</span>
+                   <span class="photo-label">${label}</span>
+                   <span class="photo-arrow">→</span>`;
+    list.appendChild(a);
+  });
+  document.getElementById('photo-modal').style.display = 'flex';
 }
+
+function closePhotoModal() {
+  document.getElementById('photo-modal').style.display = 'none';
+}
+document.getElementById('photo-modal').addEventListener('click', function(e) {
+  if (e.target === this) closePhotoModal();
+});
 
 // ════ LINE DRAWING ════
 // S-kurva (bezier) per förälder i förälderns nationalitetsfärg.
@@ -1441,7 +1524,6 @@ document.querySelectorAll('.lang-btn').forEach(btn =>
 // ════════════════════════════════════════════════════════
 const GOOG_CLIENT_ID  = '954461686218-bh0238cc4ddd2eld8ju6dqb5350qaomp.apps.googleusercontent.com';
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwgRXCv0_UmjFfLb8mVb4fH_Ei_ikcD5sWXUIza82SiZM8oTZkBNnXeTCiradJkdozcHQ/exec';
-const PHOTOS_ALBUM_URL = 'https://photos.app.goo.gl/taPU3v54CCnBHVX97';
 
 // ════ AUTH STATE ════
 let authUser  = null;  // { email, name, picture }
