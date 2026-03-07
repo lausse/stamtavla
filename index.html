@@ -151,6 +151,15 @@ body.lang-de .barn::before { content: 'Kinder: '; }
   transition: background .1s;
 }
 .det-link:hover { background: #efefef; }
+/* ── Barn / Syskon — etikett i linje med cirkeln, namn för sig ── */
+.det-rels  { display: flex; gap: 8px; margin-bottom: 14px; align-items: flex-start; }
+.rel-label { font-size: 9.5px; font-weight: 700; letter-spacing: .6px;
+             text-transform: uppercase; color: #bbb;
+             white-space: nowrap; padding-top: 4px; min-width: 54px; }
+.rel-list  { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.rel-item  { display: flex; align-items: center; gap: 3px; }
+.rel-sex   { font-size: 10px; color: #999; }
+
 .det-text { font-size: 12px; color: #444; line-height: 1.6; }
 .det-note { font-size: 11px; color: #999; font-style: italic; margin-top: 5px; }
 .det-empty { font-size: 12px; color: #ccc; font-style: italic; padding: 20px 0; text-align: center; }
@@ -172,6 +181,22 @@ body.lang-de .barn::before { content: 'Kinder: '; }
 #user-pic { width: 22px; height: 22px; border-radius: 50%; }
 #sign-out-btn { background:none; border:none; font-size:11px; color:#ccc; cursor:pointer; padding:0 0 0 4px; }
 #sign-out-btn:hover { color: #e06060; }
+
+/* ── Admin-fotolista i detaljpanelen ── */
+.det-photo-row {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 4px;
+}
+.det-photo-lnk {
+  flex: 1; font-size: 12px; color: #5ab6e0; text-decoration: none;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.det-photo-lnk:hover { text-decoration: underline; }
+.det-photo-del {
+  background: none; border: none; color: #ccc; cursor: pointer;
+  font-size: 13px; padding: 0 2px; line-height: 1; flex-shrink: 0;
+}
+.det-photo-del:hover { color: #e06060; }
+.det-photo-add { margin-top: 6px; font-size: 12px; }
 
 /* ── Fotoikon på kort ── */
 .photo-dot {
@@ -286,11 +311,129 @@ body.lang-de .barn::before { content: 'Kinder: '; }
 /* ── Stamtavla-titel klickbar ── */
 #topbar h1 { cursor: pointer; }
 #topbar h1:hover { color: #5ab6e0; }
+
+/* ── Fotovisare-modal ── */
+#photo-modal {
+  position: fixed; inset: 0; background: rgba(0,0,0,.55);
+  z-index: 110; display: none; align-items: center; justify-content: center;
+}
+#photo-box {
+  background: white; border-radius: 18px;
+  max-width: 420px; width: 92%; max-height: 75vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 8px 40px rgba(0,0,0,.28); overflow: hidden;
+}
+#photo-head {
+  padding: 13px 18px; display: flex; align-items: center; gap: 10px;
+  border-bottom: 1px solid #eee; flex-shrink: 0;
+}
+#photo-head h3 { flex: 1; font-size: 13.5px; font-weight: 700; color: #222; }
+#photo-close { background: none; border: none; font-size: 17px; color: #bbb; cursor: pointer; line-height: 1; }
+#photo-close:hover { color: #555; }
+#photo-list { overflow-y: auto; }
+.photo-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 18px; text-decoration: none; color: #333;
+  border-bottom: 1px solid #f2f2f2; transition: background .1s;
+}
+.photo-item:last-child { border-bottom: none; }
+.photo-item:hover { background: #f7f7f7; }
+.photo-icon { font-size: 20px; flex-shrink: 0; }
+.photo-label { font-size: 13px; flex: 1; line-height: 1.4; }
+.photo-arrow { color: #ccc; font-size: 13px; }
+
+/* ── Mobile backdrop (detail panel) ── */
+#det-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.35);
+  z-index: 29;
+  display: none;
+}
+#det-backdrop.visible { display: block; }
+
+/* ════ MOBILANPASSNING ════ */
+@media (max-width: 640px) {
+
+  /* ─ Topbar ─ */
+  #topbar {
+    flex-wrap: wrap;
+    padding: 8px 12px 6px;
+    gap: 6px 10px;
+  }
+  #topbar h1 { font-size: 15px; }
+  #focus-name { order: 10; width: 100%; flex: none; font-size: 12px; padding-bottom: 2px; }
+  .hint { display: none; }
+  #lang-toggle { margin-left: 0; }
+  .lang-btn { font-size: 15px; }
+  #back { font-size: 12px; padding: 5px 10px; }
+  #auth-open-btn { font-size: 11px; padding: 4px 9px; }
+  #admin-btn { font-size: 11px; padding: 4px 8px; }
+  #auth-zone { gap: 6px; }
+  #user-name { max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ─ Detail panel — bottom sheet ─ */
+  #detail {
+    position: fixed;
+    inset: auto 0 0 0;
+    width: 100%;
+    max-height: 65vh;
+    border-left: none;
+    border-top: 1px solid #ddd;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -4px 24px rgba(0,0,0,.15);
+    z-index: 30;
+    transition: transform .3s ease;
+    transform: translateY(0);
+  }
+  #detail.collapsed {
+    width: 100%;
+    transform: translateY(110%);
+  }
+  /* Handtag-rad överst i bottom sheet */
+  #detail::before {
+    content: '';
+    display: block;
+    width: 40px; height: 4px;
+    background: #ddd; border-radius: 2px;
+    margin: 8px auto 0;
+    flex-shrink: 0;
+    align-self: center;
+  }
+  #det-close { font-size: 22px; padding: 4px 8px; }
+
+  /* ─ Zoom-knappar — större tryckyta ─ */
+  .zoom-btn { width: 46px; height: 46px; font-size: 26px; }
+  #zoom-controls { bottom: 14px; }
+
+  /* ─ Admin-panel — bottom sheet ─ */
+  #admin-modal {
+    padding-top: 10px;
+    align-items: flex-end;
+    padding-bottom: 0;
+  }
+  #admin-box {
+    border-radius: 18px 18px 0 0;
+    max-height: 85vh;
+    width: 100%;
+    max-width: 100%;
+  }
+  .admin-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+    padding: 12px 14px;
+  }
+  .admin-right { justify-content: flex-start; margin-top: 4px; }
+
+  /* ─ Ansökningsmodal ─ */
+  #apply-box { padding: 20px 16px 16px; }
+  #apply-box h2 { font-size: 15px; }
+}
 </style>
 </head>
 <body class="lang-sv">
 
 <div id="toast"></div>
+<div id="det-backdrop"></div>
 
 <!-- ── Admin-panel ── -->
 <div id="admin-modal">
@@ -383,6 +526,17 @@ body.lang-de .barn::before { content: 'Kinder: '; }
 </div>
 
 
+
+<!-- ── Fotovisare-modal ── -->
+<div id="photo-modal">
+  <div id="photo-box">
+    <div id="photo-head">
+      <h3 id="photo-person-name"></h3>
+      <button id="photo-close" onclick="closePhotoModal()">✕</button>
+    </div>
+    <div id="photo-list"></div>
+  </div>
+</div>
 
 <div id="zoom-controls">
   <button class="zoom-btn" id="zoom-in">+</button>
@@ -770,16 +924,32 @@ function getSpouses(id) {
 }
 
 // ════ DETAIL PANEL ════
-const detPanel = document.getElementById('detail');
+const detPanel   = document.getElementById('detail');
+const detBackdrop = document.getElementById('det-backdrop');
+
+function showDetailPanel() {
+  detPanel.classList.remove('collapsed');
+  detBackdrop.classList.add('visible');
+}
+function closeDetailPanel() {
+  detPanel.classList.add('collapsed');
+  detBackdrop.classList.remove('visible');
+}
+detBackdrop.addEventListener('click', closeDetailPanel);
 
 function renderDetail(id) {
-  detPanel.classList.remove('collapsed');
+  showDetailPanel();
   if (!id || !P[id]) { detPanel.innerHTML = `<div class="det-empty">${LANG[lang].detEmpty}</div>`; return; }
   const p   = P[id];
   const col = COLORS[p.c] || '#bbb';
 
   function linkBtn(person) {
     return `<button class="det-link" onclick="focusPerson('${person.id}')">${person.s==='F'?'♀':'♂'} ${person.n}${person.b?' <small style="color:#aaa">*'+person.b+'</small>':''}</button>`;
+  }
+
+  function relItem(person) {
+    const sym = person.s === 'F' ? '♀' : '♂';
+    return `<span class="rel-item"><span class="rel-sex">${sym}</span><button class="det-link" onclick="focusPerson('${person.id}')">${person.n}${person.b?' <small style="color:#aaa">*'+person.b+'</small>':''}</button></span>`;
   }
 
   let html = '';
@@ -824,16 +994,16 @@ function renderDetail(id) {
   // Children
   const children = getChildren(id);
   if (children.length > 0) {
-    html += `<div class="det-section"><h4>${t.detChildren}</h4><div class="det-links">`;
-    children.forEach(c => { html += linkBtn(c); });
+    html += `<div class="det-rels"><span class="rel-label">${t.detChildren}:</span><div class="rel-list">`;
+    children.forEach(c => { html += relItem(c); });
     html += '</div></div>';
   }
 
   // Siblings
   const sibs = getSibs(id);
   if (sibs.length > 0) {
-    html += `<div class="det-section"><h4>${t.detSiblings}</h4><div class="det-links">`;
-    sibs.forEach(s => { html += linkBtn(s); });
+    html += `<div class="det-rels"><span class="rel-label">${t.detSiblings}:</span><div class="rel-list">`;
+    sibs.forEach(s => { html += relItem(s); });
     html += '</div></div>';
   }
 
@@ -842,16 +1012,35 @@ function renderDetail(id) {
     html += `<div class="det-section"><h4>${t.detNote}</h4><div class="det-note">${p.x}</div></div>`;
   }
 
-  // Fotolänk till Google Photos (visas bara för godkända)
-  if (approved) {
+  // Fotosektion
+  if (isAdmin) {
+    // ── Admin: hantera foton direkt i panelen ──
+    const items = PHOTOS[id] || [];
+    html += `<div class="det-section" id="det-photo-admin">
+      <h4>Foton</h4>
+      <div id="det-photo-list">`;
+    if (items.length === 0) {
+      html += `<div class="det-note" style="margin-bottom:6px">Inga foton kopplade ännu.</div>`;
+    } else {
+      items.forEach((item, idx) => {
+        const url   = typeof item === 'string' ? item : item.url;
+        const label = typeof item === 'string' ? `Foto ${idx + 1}` : (item.text || `Foto ${idx + 1}`);
+        html += `<div class="det-photo-row">
+          <a class="det-photo-lnk" href="${url}" target="_blank" rel="noopener">📷 ${label}</a>
+          <button class="det-photo-del" onclick="deleteAdminPhoto('${id}',${idx})" title="Ta bort">✕</button>
+        </div>`;
+      });
+    }
+    html += `</div>
+      <button class="det-link det-photo-add" onclick="showAddPhotoForm('${id}')">＋ Lägg till foto</button>
+    </div>`;
+  } else if (approved) {
     html += `<div class="det-section"><button class="photos-link" onclick="openPhotoSearch('${id}')">📷 Se foton i Google Photos</button></div>`;
   }
 
   html += '</div>'; // det-body
   detPanel.innerHTML = html;
-  document.getElementById('det-close').addEventListener('click', () => {
-    detPanel.classList.add('collapsed');
-  });
+  document.getElementById('det-close').addEventListener('click', closeDetailPanel);
 }
 
 // ════ STATE ════
@@ -910,15 +1099,129 @@ function showToast(msg, ms = 3000) {
   toastTimer = setTimeout(() => el.classList.remove('show'), ms);
 }
 
-// ════ FOTO — öppna stavla-albumet och kopiera namn ════
+// ════ FOTO — laddas från Apps Script (Sheet) med fallback till photos.json ════
+let PHOTOS = {};
+
+async function loadPhotos() {
+  try {
+    const r = await fetch(`${APPS_SCRIPT_URL}?action=get_photos`);
+    const d = await r.json();
+    if (d && typeof d === 'object' && !d.error) { PHOTOS = d; return; }
+  } catch(e) {}
+  try {
+    const r = await fetch('photos.json');
+    PHOTOS = await r.json();
+  } catch(e) {}
+}
+loadPhotos();
+
 function openPhotoSearch(personId) {
-  const p = P[personId];
-  const name = p ? p.n : personId;
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(name).catch(() => {});
+  const p     = P[personId];
+  const name  = p ? p.n : personId;
+  const items = PHOTOS[personId] || [];
+
+  if (!items.length) {
+    showToast(`Inga foton kopplade för ${name} ännu`);
+    return;
   }
-  window.open(PHOTOS_ALBUM_URL, '_blank', 'noopener');
-  showToast(`Albumet öppnas — sök på "${name}" (kopierat till urklipp)`);
+
+  // En enda bild → öppna direkt
+  if (items.length === 1) {
+    const url = typeof items[0] === 'string' ? items[0] : items[0].url;
+    window.open(url, '_blank', 'noopener');
+    return;
+  }
+
+  // Flera bilder → visa modal
+  document.getElementById('photo-person-name').textContent = '📷 ' + name;
+  const list = document.getElementById('photo-list');
+  list.innerHTML = '';
+  items.forEach((item, i) => {
+    const url   = typeof item === 'string' ? item : item.url;
+    const label = typeof item === 'string' ? `Foto ${i + 1}` : (item.text || `Foto ${i + 1}`);
+    const a = document.createElement('a');
+    a.className = 'photo-item';
+    a.href      = url;
+    a.target    = '_blank';
+    a.rel       = 'noopener';
+    a.innerHTML = `<span class="photo-icon">📷</span>
+                   <span class="photo-label">${label}</span>
+                   <span class="photo-arrow">→</span>`;
+    list.appendChild(a);
+  });
+  document.getElementById('photo-modal').style.display = 'flex';
+}
+
+function closePhotoModal() {
+  document.getElementById('photo-modal').style.display = 'none';
+}
+document.getElementById('photo-modal').addEventListener('click', function(e) {
+  if (e.target === this) closePhotoModal();
+});
+
+// ════ ADMIN — fotolänkar per person ════
+function showAddPhotoForm(personId) {
+  const admin = document.getElementById('det-photo-admin');
+  if (!admin) return;
+  admin.querySelector('.det-photo-add').style.display = 'none';
+  const form = document.createElement('div');
+  form.id = 'add-photo-form';
+  form.style.marginTop = '8px';
+  form.innerHTML = `
+    <div class="apply-field" style="margin-bottom:7px">
+      <label>Foto-URL (klistra in från Google Photos)</label>
+      <input id="new-photo-url" type="url" placeholder="https://photos.google.com/photo/…">
+    </div>
+    <div class="apply-field" style="margin-bottom:8px">
+      <label>Bildtext (valfri)</label>
+      <input id="new-photo-text" type="text" placeholder="T.ex. Deportationshandling 1945">
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="det-link" style="background:#5ab6e0;color:#fff;border-color:#5ab6e0"
+              onclick="saveAdminPhoto('${personId}')">Spara</button>
+      <button class="det-link" onclick="renderDetail('${personId}')">Avbryt</button>
+    </div>
+    <div id="add-photo-status" style="font-size:11px;margin-top:6px;min-height:16px"></div>`;
+  admin.appendChild(form);
+  document.getElementById('new-photo-url').focus();
+}
+
+async function saveAdminPhoto(personId) {
+  const url    = (document.getElementById('new-photo-url').value || '').trim();
+  const text   = (document.getElementById('new-photo-text').value || '').trim();
+  const status = document.getElementById('add-photo-status');
+  if (!url) { status.textContent = 'Klistra in en URL.'; status.style.color = '#e06060'; return; }
+
+  status.textContent = 'Sparar…'; status.style.color = '#888';
+  try {
+    const r = await fetch(
+      `${APPS_SCRIPT_URL}?action=save_photo&personId=${encodeURIComponent(personId)}`
+      + `&url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`
+      + `&token=${encodeURIComponent(authToken)}`
+    );
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Okänt fel');
+    if (!PHOTOS[personId]) PHOTOS[personId] = [];
+    PHOTOS[personId].push(text ? {url, text} : url);
+    showToast(`📷 Foto sparat`);
+    renderDetail(personId);
+  } catch(e) {
+    status.textContent = `Fel: ${e.message}`; status.style.color = '#e06060';
+  }
+}
+
+async function deleteAdminPhoto(personId, idx) {
+  try {
+    const r = await fetch(
+      `${APPS_SCRIPT_URL}?action=delete_photo&personId=${encodeURIComponent(personId)}`
+      + `&idx=${idx}&token=${encodeURIComponent(authToken)}`
+    );
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Okänt fel');
+    if (PHOTOS[personId]) PHOTOS[personId].splice(idx, 1);
+    showToast('Foto borttaget');
+    renderDetail(personId);
+  } catch(e) { showToast(`Fel: ${e.message}`); }
 }
 
 // ════ LINE DRAWING ════
@@ -1092,7 +1395,6 @@ function render(rootId) {
         card.addEventListener('click', () => focusPerson(id));
       } else {
         card.addEventListener('click', () => {
-          detPanel.classList.remove('collapsed');
           renderDetail(id);
         });
       }
@@ -1259,25 +1561,42 @@ document.getElementById('zoom-out').addEventListener('click', () => {
   zoom = Math.max(0.3, zoom - 0.15); applyZoom();
 });
 
-// Pinch-to-zoom
+// Pinch-to-zoom (centrerat på klämpunkten)
 let pinchDist0 = null, zoom0 = 1;
+let pinchCx = 0, pinchCy = 0;   // klämpunktens mittpunkt relativt viewport-elementet
+let scrollX0 = 0, scrollY0 = 0; // scroll vid gesturens start
+
 viewport.addEventListener('touchstart', e => {
   if (e.touches.length === 2) {
-    pinchDist0 = Math.hypot(
-      e.touches[0].clientX - e.touches[1].clientX,
-      e.touches[0].clientY - e.touches[1].clientY
-    );
+    const t0 = e.touches[0], t1 = e.touches[1];
+    pinchDist0 = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
     zoom0 = zoom;
+    // Klämpunktens mittpunkt i viewport-koordinater
+    const rect = viewport.getBoundingClientRect();
+    pinchCx = ((t0.clientX + t1.clientX) / 2) - rect.left;
+    pinchCy = ((t0.clientY + t1.clientY) / 2) - rect.top;
+    // Spara scroll vid start
+    scrollX0 = viewport.scrollLeft;
+    scrollY0 = viewport.scrollTop;
   }
 }, { passive: true });
+
 viewport.addEventListener('touchmove', e => {
   if (e.touches.length === 2 && pinchDist0) {
-    const d = Math.hypot(
-      e.touches[0].clientX - e.touches[1].clientX,
-      e.touches[0].clientY - e.touches[1].clientY
-    );
+    const t0 = e.touches[0], t1 = e.touches[1];
+    const d = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
     zoom = Math.max(0.3, Math.min(2.2, zoom0 * (d / pinchDist0)));
+
+    // Innehållspunkten som låg under klämpunktens mitt vid gesturtstart
+    const contentX = (scrollX0 + pinchCx) / zoom0;
+    const contentY = (scrollY0 + pinchCy) / zoom0;
+
     applyZoom();
+
+    // Rulla så att samma innehållspunkt hamnar kvar under klämpunkten
+    viewport.scrollLeft = contentX * zoom - pinchCx;
+    viewport.scrollTop  = contentY * zoom - pinchCy;
+
     e.preventDefault();
   }
 }, { passive: false });
@@ -1330,12 +1649,12 @@ document.querySelectorAll('.lang-btn').forEach(btn =>
 // ════════════════════════════════════════════════════════
 const GOOG_CLIENT_ID  = '954461686218-bh0238cc4ddd2eld8ju6dqb5350qaomp.apps.googleusercontent.com';
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwgRXCv0_UmjFfLb8mVb4fH_Ei_ikcD5sWXUIza82SiZM8oTZkBNnXeTCiradJkdozcHQ/exec';
-const PHOTOS_ALBUM_URL = 'https://photos.app.goo.gl/taPU3v54CCnBHVX97';
 
 // ════ AUTH STATE ════
 let authUser  = null;  // { email, name, picture }
 let authToken = null;  // Google ID-token (för API-anrop)
 let approved  = false;
+let isAdmin   = false;
 let gsiReady  = false;
 const LASSE_EMAIL_CLIENT = 'lausse@gmail.com';
 
@@ -1376,10 +1695,11 @@ window.handleCredentialResponse = async function(response) {
   } catch(e) { approved = false; }
 
   if (approved) {
+    isAdmin = authUser.email.toLowerCase() === LASSE_EMAIL_CLIENT;
     closeApplyModal();
     renderPhotoIndicators();
     renderDetail(currentRoot);
-    if (authUser.email.toLowerCase() === LASSE_EMAIL_CLIENT)
+    if (isAdmin)
       document.getElementById('admin-btn').style.display = '';
   } else {
     // Inloggad men ej godkänd: visa ansökningsformuläret (med namn förifyllt från Google)
@@ -1398,6 +1718,7 @@ function signOut() {
   authUser  = null;
   authToken = null;
   approved  = false;
+  isAdmin   = false;
   document.getElementById('user-chip').style.display = 'none';
   document.getElementById('auth-open-btn').style.display = '';
   document.getElementById('admin-btn').style.display = 'none';
