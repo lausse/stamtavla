@@ -47,6 +47,9 @@ canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
 .note { font-size: 9px; color: #aaa; font-style: italic; }
 
 .sibs { margin-top: 5px; padding-top: 4px; border-top: 1px solid rgba(0,0,0,.07); display: flex; flex-wrap: wrap; gap: 3px; }
+.sibs::before { font-size: 10px; font-weight: 700; color: #ccc; display: block; width: 100%; margin-bottom: 1px; }
+body.lang-sv .sibs::before { content: 'syskon: '; }
+body.lang-de .sibs::before { content: 'Geschwister: '; }
 .sib { font-size: 10px; padding: 2px 7px; border-radius: 10px; border: 1px solid; cursor: pointer; white-space: nowrap; transition: filter .1s; background: white; }
 .sib:hover { filter: brightness(.92); }
 
