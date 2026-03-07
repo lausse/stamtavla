@@ -1355,25 +1355,42 @@ document.getElementById('zoom-out').addEventListener('click', () => {
   zoom = Math.max(0.3, zoom - 0.15); applyZoom();
 });
 
-// Pinch-to-zoom
+// Pinch-to-zoom (centrerat på klämpunkten)
 let pinchDist0 = null, zoom0 = 1;
+let pinchCx = 0, pinchCy = 0;   // klämpunktens mittpunkt relativt viewport-elementet
+let scrollX0 = 0, scrollY0 = 0; // scroll vid gesturens start
+
 viewport.addEventListener('touchstart', e => {
   if (e.touches.length === 2) {
-    pinchDist0 = Math.hypot(
-      e.touches[0].clientX - e.touches[1].clientX,
-      e.touches[0].clientY - e.touches[1].clientY
-    );
+    const t0 = e.touches[0], t1 = e.touches[1];
+    pinchDist0 = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
     zoom0 = zoom;
+    // Klämpunktens mittpunkt i viewport-koordinater
+    const rect = viewport.getBoundingClientRect();
+    pinchCx = ((t0.clientX + t1.clientX) / 2) - rect.left;
+    pinchCy = ((t0.clientY + t1.clientY) / 2) - rect.top;
+    // Spara scroll vid start
+    scrollX0 = viewport.scrollLeft;
+    scrollY0 = viewport.scrollTop;
   }
 }, { passive: true });
+
 viewport.addEventListener('touchmove', e => {
   if (e.touches.length === 2 && pinchDist0) {
-    const d = Math.hypot(
-      e.touches[0].clientX - e.touches[1].clientX,
-      e.touches[0].clientY - e.touches[1].clientY
-    );
+    const t0 = e.touches[0], t1 = e.touches[1];
+    const d = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
     zoom = Math.max(0.3, Math.min(2.2, zoom0 * (d / pinchDist0)));
+
+    // Innehållspunkten som låg under klämpunktens mitt vid gesturtstart
+    const contentX = (scrollX0 + pinchCx) / zoom0;
+    const contentY = (scrollY0 + pinchCy) / zoom0;
+
     applyZoom();
+
+    // Rulla så att samma innehållspunkt hamnar kvar under klämpunkten
+    viewport.scrollLeft = contentX * zoom - pinchCx;
+    viewport.scrollTop  = contentY * zoom - pinchCy;
+
     e.preventDefault();
   }
 }, { passive: false });
