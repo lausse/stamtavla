@@ -982,6 +982,41 @@ function birthYear(p) {
   return m ? parseInt(m[0], 10) : 9999;
 }
 
+function deathYear(p) {
+  if (!p.d) return null;
+  const m = p.d.match(/\d{4}/);
+  return m ? parseInt(m[0], 10) : null;
+}
+
+// Beräknar ett rimligt [start, slut] för en persons levnadstid
+function aliveRange(p) {
+  const born  = birthYear(p);
+  const died  = deathYear(p);
+  const b     = born  !== 9999 ? born  : null;
+  const d     = died  !== null ? died  : null;
+  const start = b ?? (d ? d - 80 : 1800);
+  const end   = d ?? (b ? b + 105 : 2100);
+  return [start, end];
+}
+
+// Uppdaterar synligheten i fotopersonlistan baserat på vad som är ikryssat
+window.filterPhotoPersons = function() {
+  const checked = [...document.querySelectorAll('input[name="photo-persons"]:checked')]
+    .map(el => el.value);
+  const rows = document.querySelectorAll('.photo-person-row');
+  if (!checked.length) { rows.forEach(r => r.style.display = ''); return; }
+
+  const ranges = checked.map(id => aliveRange(P[id]));
+
+  rows.forEach(row => {
+    const id = row.querySelector('input').value;
+    if (checked.includes(id)) { row.style.display = ''; return; } // aldrig dölj ikryssade
+    const [s, e] = aliveRange(P[id]);
+    const ok = ranges.every(([cs, ce]) => Math.max(s, cs) <= Math.min(e, ce));
+    row.style.display = ok ? '' : 'none';
+  });
+};
+
 function getSibs(id) {
   const p = P[id];
   return Object.values(P).filter(o =>
@@ -1374,8 +1409,8 @@ function showAddPhotoForm(personId) {
   const checkboxes = sorted.map(([id, p]) => {
     const col = COLORS[p.c] || '#bbb';
     const checked = id === personId ? 'checked' : '';
-    return `<label style="display:flex;align-items:center;gap:7px;padding:3px 0;cursor:pointer;font-size:12px">
-      <input type="checkbox" name="photo-persons" value="${id}" ${checked} style="accent-color:${col}">
+    return `<label class="photo-person-row" style="display:flex;align-items:center;gap:7px;padding:3px 0;cursor:pointer;font-size:12px">
+      <input type="checkbox" name="photo-persons" value="${id}" ${checked} onchange="filterPhotoPersons()" style="accent-color:${col}">
       <span style="width:9px;height:9px;border-radius:50%;background:${col};flex-shrink:0;display:inline-block"></span>
       ${p.n}${p.b ? ` <span style="color:#bbb;font-size:10px">*${p.b}</span>` : ''}
     </label>`;
