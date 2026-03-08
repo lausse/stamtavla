@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Stavla – Interaktiv stamtavla</title>
 <script src="https://accounts.google.com/gsi/client" async defer></script>
+<!-- Firebase (valfritt — fyll i FIREBASE_CONFIG nedan för kommentarer och admin-redigering) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -22,7 +25,8 @@ body { background: #eae6e0; font-family: -apple-system, BlinkMacSystemFont, 'Seg
 #back:disabled { opacity: .35; cursor: default; }
 .hint { font-size: 11px; color: #bbb; white-space: nowrap; }
 
-#viewport { flex: 1; overflow: auto; position: relative; touch-action: pan-x pan-y; }
+#viewport { flex: 1; overflow: auto; position: relative; touch-action: pan-x pan-y; cursor: grab; }
+#viewport.vp-dragging { cursor: grabbing; }
 
 #wrap { position: relative; }
 
@@ -632,6 +636,75 @@ const LANG = {
 let lang = 'sv';
 
 // ════════════════════════════════════════════════════
+// FIREBASE — fyll i för att aktivera kommentarer och admin-textredigering.
+// Lämna null för att köra utan (allt annat fungerar ändå).
+// ════════════════════════════════════════════════════
+const FIREBASE_CONFIG = null;
+/* Exempel:
+const FIREBASE_CONFIG = {
+  apiKey:            "AIza...",
+  authDomain:        "ditt-projekt.firebaseapp.com",
+  projectId:         "ditt-projekt",
+  storageBucket:     "ditt-projekt.appspot.com",
+  messagingSenderId: "12345",
+  appId:             "1:12345:web:abc"
+};
+*/
+
+let db = null;
+if (FIREBASE_CONFIG && typeof firebase !== 'undefined') {
+  try { firebase.initializeApp(FIREBASE_CONFIG); db = firebase.firestore(); }
+  catch(e) { console.warn('Firebase:', e); }
+}
+
+// ── Google Translate (inofficiell gratis-endpoint, ingen API-nyckel) ──
+const _tCache = {};
+async function autoTranslate(text, from, to) {
+  if (!text) return text;
+  const key = `${from}|${to}|${text.slice(0,40)}`;
+  if (_tCache[key]) return _tCache[key];
+  try {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${from}&tl=${to}&dt=t&q=${encodeURIComponent(text)}`;
+    const r = await fetch(url);
+    const d = await r.json();
+    const result = d[0].map(s => s[0]).join('');
+    _tCache[key] = result;
+    return result;
+  } catch(e) { return text; }
+}
+
+// ── Kommentarer ──
+async function loadComments(personId) {
+  if (!db) return [];
+  const snap = await db.collection('comments').doc(personId)
+    .collection('items').orderBy('timestamp').get();
+  return snap.docs.map(d => d.data());
+}
+async function saveComment(personId, text) {
+  if (!db || !authUser) return;
+  await db.collection('comments').doc(personId).collection('items').add({
+    text, author: authUser.name, email: authUser.email,
+    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+  });
+}
+
+// ── Admin: spara beskrivning ──
+async function saveDesc(personId, sv, de, en) {
+  if (!db || !isAdmin) return;
+  await db.collection('persons').doc(personId).set({ descSv: sv, descDe: de, descEn: en }, { merge: true });
+  if (P[personId]) {
+    P[personId].desc    = sv;
+    P[personId].desc_de = de;
+    P[personId].desc_en = en;
+  }
+}
+async function loadDescOverride(personId) {
+  if (!db) return null;
+  const d = await db.collection('persons').doc(personId).get();
+  return d.exists ? d.data() : null;
+}
+
+// ════════════════════════════════════════════════════
 // PEOPLE DATA
 // fi = fatherId, mi = motherId
 // b = born, d = died, s = sex (M/F), c = color class
@@ -971,7 +1044,7 @@ const detBackdrop = document.getElementById('det-backdrop');
 
 function showDetailPanel() {
   detPanel.classList.remove('collapsed');
-  detBackdrop.classList.add('visible');
+  if (window.innerWidth <= 640) detBackdrop.classList.add('visible');
 }
 function closeDetailPanel() {
   detPanel.classList.add('collapsed');
@@ -979,11 +1052,19 @@ function closeDetailPanel() {
 }
 detBackdrop.addEventListener('click', closeDetailPanel);
 
-function renderDetail(id) {
+async function renderDetail(id) {
   showDetailPanel();
   if (!id || !P[id]) { detPanel.innerHTML = `<div class="det-empty">${LANG[lang].detEmpty}</div>`; return; }
   const p   = P[id];
   const col = COLORS[p.c] || '#bbb';
+
+  // Ladda eventuella Firebase-overrides
+  const override = await loadDescOverride(id);
+  if (override) {
+    if (override.descSv) p.desc    = override.descSv;
+    if (override.descDe) p.desc_de = override.descDe;
+    if (override.descEn) p.desc_en = override.descEn;
+  }
 
   function linkBtn(person) {
     return `<button class="det-link" onclick="focusPerson('${person.id}')">${person.s==='F'?'♀':'♂'} ${person.n}${person.b?' <small style="color:#aaa">*'+person.b+'</small>':''}</button>`;
@@ -1008,9 +1089,14 @@ function renderDetail(id) {
 
   html += '<div class="det-body">';
 
-  // Description
+  // Description — auto-translate till engelska om desc_en saknas
   const t = LANG[lang];
-  const descText = p['desc_' + lang] || p.desc;
+  let descText = p['desc_' + lang] || (lang !== 'sv' ? '' : p.desc);
+  if (!descText && lang === 'en' && p.desc) {
+    descText = await autoTranslate(p.desc, 'sv', 'en');
+  } else if (!descText) {
+    descText = p.desc || '';
+  }
   if (descText) {
     html += `<div class="det-section"><div class="det-text">${descText}</div></div>`;
   }
@@ -1080,10 +1166,89 @@ function renderDetail(id) {
     html += `<div class="det-section"><button class="photos-link" onclick="openPhotoSearch('${id}')">📷 Se foton i Google Photos</button></div>`;
   }
 
+  // Admin: textredigering
+  if (isAdmin && db) {
+    html += `<div class="det-section" id="det-edit-section">
+      <h4 style="margin-bottom:8px">✏️ Redigera text</h4>
+      <div style="font-size:11px;color:#aaa;margin-bottom:4px">Svenska</div>
+      <textarea id="det-edit-sv" style="width:100%;min-height:70px;font-size:12px;padding:6px;border:1px solid #ddd;border-radius:6px;font-family:inherit;resize:vertical;margin-bottom:6px">${(p.desc||'').replace(/</g,'&lt;')}</textarea>
+      <div style="font-size:11px;color:#aaa;margin-bottom:4px">Tyska (desc_de)</div>
+      <textarea id="det-edit-de" style="width:100%;min-height:70px;font-size:12px;padding:6px;border:1px solid #ddd;border-radius:6px;font-family:inherit;resize:vertical;margin-bottom:6px">${(p.desc_de||'').replace(/</g,'&lt;')}</textarea>
+      <div style="font-size:11px;color:#aaa;margin-bottom:4px">Engelska (desc_en, lämna tom = auto-translate)</div>
+      <textarea id="det-edit-en" style="width:100%;min-height:70px;font-size:12px;padding:6px;border:1px solid #ddd;border-radius:6px;font-family:inherit;resize:vertical;margin-bottom:8px">${(p.desc_en||'').replace(/</g,'&lt;')}</textarea>
+      <div style="display:flex;gap:8px">
+        <button onclick="doSaveDesc('${id}')" style="padding:5px 14px;background:#333;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">Spara</button>
+        <button onclick="document.getElementById('det-edit-section').style.display='none'" style="padding:5px 12px;background:#eee;border:none;border-radius:6px;cursor:pointer;font-size:12px">Dölj</button>
+      </div>
+    </div>`;
+  }
+
+  // Kommentarer
+  if (db) {
+    html += `<div class="det-section" id="det-comments">
+      <h4 style="margin-bottom:10px">💬 ${lang==='de'?'Kommentare':lang==='en'?'Comments':'Kommentarer'}</h4>
+      <div id="det-cmt-list" style="margin-bottom:10px"><div style="font-size:12px;color:#ccc">Laddar…</div></div>`;
+    if (authUser) {
+      html += `<div style="display:flex;flex-direction:column;gap:6px">
+        <textarea id="det-cmt-input" placeholder="${lang==='de'?'Kommentar…':lang==='en'?'Add a comment…':'Lägg till kommentar…'}" style="width:100%;min-height:60px;font-size:12px;padding:7px;border:1px solid #ddd;border-radius:7px;font-family:inherit;resize:none"></textarea>
+        <button onclick="doAddComment('${id}')" style="align-self:flex-end;padding:5px 16px;background:#333;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:12px">${lang==='de'?'Senden':lang==='en'?'Send':'Skicka'}</button>
+      </div>`;
+    } else {
+      html += `<div style="font-size:12px;color:#aaa;text-align:center;padding:4px">${lang==='de'?'Melden Sie sich an, um zu kommentieren.':lang==='en'?'Sign in to comment.':'Logga in för att kommentera.'}</div>`;
+    }
+    html += '</div>';
+  }
+
   html += '</div>'; // det-body
   detPanel.innerHTML = html;
   document.getElementById('det-close').addEventListener('click', closeDetailPanel);
+
+  // Ladda kommentarer asynkront
+  if (db) {
+    loadComments(id).then(cmts => {
+      const el = document.getElementById('det-cmt-list');
+      if (!el) return;
+      if (!cmts.length) {
+        el.innerHTML = `<div style="font-size:12px;color:#ccc">${lang==='de'?'Noch keine Kommentare.':lang==='en'?'No comments yet.':'Inga kommentarer ännu.'}</div>`;
+        return;
+      }
+      el.innerHTML = cmts.map(c => {
+        const time = c.timestamp ? new Date(c.timestamp.toMillis()).toLocaleDateString('sv-SE') : '';
+        return `<div style="padding:8px 10px;background:#f5f5f5;border-radius:7px;margin-bottom:6px">
+          <div style="font-size:11px;color:#888"><b>${c.author||'–'}</b> <span style="color:#ccc">${time}</span></div>
+          <div style="font-size:13px;color:#333;margin-top:3px">${c.text||''}</div>
+        </div>`;
+      }).join('');
+    });
+  }
 }
+
+window.doSaveDesc = async function(id) {
+  const sv = document.getElementById('det-edit-sv')?.value || '';
+  const de = document.getElementById('det-edit-de')?.value || '';
+  const en = document.getElementById('det-edit-en')?.value || '';
+  await saveDesc(id, sv, de, en);
+  renderDetail(id);
+};
+window.doAddComment = async function(id) {
+  const el = document.getElementById('det-cmt-input');
+  const text = el?.value.trim();
+  if (!text) return;
+  await saveComment(id, text);
+  if (el) el.value = '';
+  // Ladda om kommentarslistan
+  loadComments(id).then(cmts => {
+    const listEl = document.getElementById('det-cmt-list');
+    if (!listEl) return;
+    listEl.innerHTML = cmts.map(c => {
+      const time = c.timestamp ? new Date(c.timestamp.toMillis()).toLocaleDateString('sv-SE') : '';
+      return `<div style="padding:8px 10px;background:#f5f5f5;border-radius:7px;margin-bottom:6px">
+        <div style="font-size:11px;color:#888"><b>${c.author||'–'}</b> <span style="color:#ccc">${time}</span></div>
+        <div style="font-size:13px;color:#333;margin-top:3px">${c.text||''}</div>
+      </div>`;
+    }).join('') || `<div style="font-size:12px;color:#ccc">Inga kommentarer ännu.</div>`;
+  });
+};
 
 // ════ STATE ════
 const hist = [];
@@ -1620,6 +1785,40 @@ document.getElementById('zoom-in').addEventListener('click', () => {
 });
 document.getElementById('zoom-out').addEventListener('click', () => {
   zoom = Math.max(0.3, zoom - 0.15); applyZoom();
+});
+
+// ── Mushjul = zoom centrerat på muspekaren (som Riksarkivet) ──
+viewport.addEventListener('wheel', e => {
+  e.preventDefault();
+  const rect   = viewport.getBoundingClientRect();
+  const mx     = e.clientX - rect.left;  // musens X relativt viewport
+  const my     = e.clientY - rect.top;
+  const cxBefore = (viewport.scrollLeft + mx) / zoom;  // punkten i wrap-koordinater
+  const cyBefore = (viewport.scrollTop  + my) / zoom;
+  const factor = e.deltaY < 0 ? 1.1 : 0.9;
+  zoom = Math.max(0.3, Math.min(2.2, zoom * factor));
+  applyZoom();
+  viewport.scrollLeft = cxBefore * zoom - mx;
+  viewport.scrollTop  = cyBefore * zoom - my;
+}, { passive: false });
+
+// ── Klicka + dra = panorering ──
+let vpDragging = false, vpDragX = 0, vpDragY = 0, vpScrollX = 0, vpScrollY = 0;
+viewport.addEventListener('mousedown', e => {
+  if (e.target.closest('.card') || e.target.closest('#zoom-controls') || e.target.closest('#detail')) return;
+  vpDragging = true;
+  vpDragX = e.clientX; vpDragY = e.clientY;
+  vpScrollX = viewport.scrollLeft; vpScrollY = viewport.scrollTop;
+  viewport.classList.add('vp-dragging');
+});
+window.addEventListener('mousemove', e => {
+  if (!vpDragging) return;
+  viewport.scrollLeft = vpScrollX - (e.clientX - vpDragX);
+  viewport.scrollTop  = vpScrollY - (e.clientY - vpDragY);
+});
+window.addEventListener('mouseup', () => {
+  vpDragging = false;
+  viewport.classList.remove('vp-dragging');
 });
 
 // Pinch-to-zoom (centrerat på klämpunkten)
