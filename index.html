@@ -1339,6 +1339,14 @@ function showToast(msg, ms = 3000) {
 let PHOTOS = {};
 
 async function loadPhotos() {
+  // Försök Firebase först, falla tillbaka på Apps Script / photos.json
+  if (db) {
+    try {
+      const snap = await db.collection('photos').get();
+      snap.forEach(doc => { PHOTOS[doc.id] = doc.data().items || []; });
+      return;
+    } catch(e) {}
+  }
   try {
     const r = await fetch(`${APPS_SCRIPT_URL}?action=get_photos`);
     const d = await r.json();
@@ -1445,24 +1453,26 @@ function showAddPhotoForm(personId) {
   document.getElementById('new-photo-url').focus();
 }
 
+async function savePhotoToFirebase(pid, url, text) {
+  if (!db) throw new Error('Firebase ej konfigurerat');
+  const entry = text ? { url, text } : { url };
+  const ref   = db.collection('photos').doc(pid);
+  const snap  = await ref.get();
+  const items = snap.exists ? (snap.data().items || []) : [];
+  items.push(entry);
+  await ref.set({ items });
+  PHOTOS[pid] = items;
+}
+
 async function saveAdminPhoto(personId) {
   const url    = (document.getElementById('new-photo-url').value || '').trim();
   const text   = (document.getElementById('new-photo-text').value || '').trim();
   const status = document.getElementById('add-photo-status');
   if (!url) { status.textContent = 'Klistra in en URL.'; status.style.color = '#e06060'; return; }
-
   status.textContent = 'Sparar…'; status.style.color = '#888';
   try {
-    const r = await fetch(
-      `${APPS_SCRIPT_URL}?action=save_photo&personId=${encodeURIComponent(personId)}`
-      + `&url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`
-      + `&token=${encodeURIComponent(authToken)}`
-    );
-    const d = await r.json();
-    if (!d.ok) throw new Error(d.error || 'Okänt fel');
-    if (!PHOTOS[personId]) PHOTOS[personId] = [];
-    PHOTOS[personId].push(text ? {url, text} : url);
-    showToast(`📷 Foto sparat`);
+    await savePhotoToFirebase(personId, url, text);
+    showToast('📷 Foto sparat');
     renderDetail(personId);
   } catch(e) {
     status.textContent = `Fel: ${e.message}`; status.style.color = '#e06060';
@@ -1481,19 +1491,8 @@ async function saveMultiPhoto(originPersonId) {
 
   status.textContent = `Sparar till ${checked.length} person${checked.length > 1 ? 'er' : ''}…`;
   status.style.color = '#888';
-
   try {
-    await Promise.all(checked.map(pid =>
-      fetch(
-        `${APPS_SCRIPT_URL}?action=save_photo&personId=${encodeURIComponent(pid)}`
-        + `&url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`
-        + `&token=${encodeURIComponent(authToken)}`
-      ).then(r => r.json()).then(d => {
-        if (!d.ok) throw new Error(d.error || 'Okänt fel');
-        if (!PHOTOS[pid]) PHOTOS[pid] = [];
-        PHOTOS[pid].push(text ? {url, text} : url);
-      })
-    ));
+    await Promise.all(checked.map(pid => savePhotoToFirebase(pid, url, text)));
     showToast(`📷 Foto kopplat till ${checked.length} person${checked.length > 1 ? 'er' : ''}`);
     renderDetail(originPersonId);
   } catch(e) {
@@ -1503,13 +1502,10 @@ async function saveMultiPhoto(originPersonId) {
 
 async function deleteAdminPhoto(personId, idx) {
   try {
-    const r = await fetch(
-      `${APPS_SCRIPT_URL}?action=delete_photo&personId=${encodeURIComponent(personId)}`
-      + `&idx=${idx}&token=${encodeURIComponent(authToken)}`
-    );
-    const d = await r.json();
-    if (!d.ok) throw new Error(d.error || 'Okänt fel');
-    if (PHOTOS[personId]) PHOTOS[personId].splice(idx, 1);
+    if (!db) throw new Error('Firebase ej konfigurerat');
+    const items = (PHOTOS[personId] || []).filter((_, i) => i !== idx);
+    await db.collection('photos').doc(personId).set({ items });
+    PHOTOS[personId] = items;
     showToast('Foto borttaget');
     renderDetail(personId);
   } catch(e) { showToast(`Fel: ${e.message}`); }
