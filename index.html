@@ -1137,9 +1137,8 @@ async function renderDetail(id) {
     html += `<div class="det-section"><h4>${t.detNote}</h4><div class="det-note">${p.x}</div></div>`;
   }
 
-  // Fotosektion
-  if (isAdmin) {
-    // ── Admin: hantera foton direkt i panelen ──
+  // Fotosektion — visas för admin och alla godkända användare
+  if (isAdmin || approved) {
     const items = PHOTOS[id] || [];
     html += `<div class="det-section" id="det-photo-admin">
       <h4>Foton</h4>
@@ -1152,15 +1151,13 @@ async function renderDetail(id) {
         const label = typeof item === 'string' ? `Foto ${idx + 1}` : (item.text || `Foto ${idx + 1}`);
         html += `<div class="det-photo-row">
           <a class="det-photo-lnk" href="${url}" target="_blank" rel="noopener">📷 ${label}</a>
-          <button class="det-photo-del" onclick="deleteAdminPhoto('${id}',${idx})" title="Ta bort">✕</button>
+          ${isAdmin ? `<button class="det-photo-del" onclick="deleteAdminPhoto('${id}',${idx})" title="Ta bort">✕</button>` : ''}
         </div>`;
       });
     }
     html += `</div>
       <button class="det-link det-photo-add" onclick="showAddPhotoForm('${id}')">＋ Lägg till foto</button>
     </div>`;
-  } else if (approved) {
-    html += `<div class="det-section"><button class="photos-link" onclick="openPhotoSearch('${id}')">📷 Se foton i Google Photos</button></div>`;
   }
 
   // Admin: liten redigera-knapp + dold editor
@@ -1373,7 +1370,8 @@ function showAddPhotoForm(personId) {
   form.style.marginTop = '8px';
   form.innerHTML = `
     <div class="apply-field" style="margin-bottom:7px">
-      <label>Foto-URL (klistra in från Google Photos)</label>
+      <label>Länk till bilden</label>
+      <div style="font-size:11px;color:#aaa;margin-bottom:5px;line-height:1.5">Klistra in en <strong>offentlig delningslänk</strong> — det går inte att ladda upp bilder direkt här. Dela bilden från t.ex. Google Photos, iCloud eller Dropbox och kopiera länken därifrån.</div>
       <input id="new-photo-url" type="url" placeholder="https://photos.google.com/photo/…">
     </div>
     <div class="apply-field" style="margin-bottom:8px">
