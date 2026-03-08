@@ -456,6 +456,7 @@ canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
   <div id="lang-toggle">
     <button class="lang-btn active" data-lang="sv">🇸🇪</button>
     <button class="lang-btn"        data-lang="de">🇩🇪</button>
+    <button class="lang-btn"        data-lang="en">🇺🇸</button>
   </div>
   <div id="auth-zone">
     <button id="admin-btn" onclick="openAdminPanel()" title="Bildarkiv — ansökningar">📋 Admin</button>
@@ -599,6 +600,33 @@ const LANG = {
     signinText:     'Melden Sie sich mit Ihrem Google-Konto an, um die Familienfotos zu sehen.',
     pendingTitle:   'Anfrage gesendet!',
     pendingText:    'Lasse erhält eine E-Mail mit Ihrer Anfrage und genehmigt sie über sein Mobiltelefon. Beim nächsten Login erhalten Sie direkt Zugang.',
+  },
+  en: {
+    title:    'Family Tree',
+    back:     '← Back',
+    hint:     'Click a sibling to centre the tree on that person',
+    genLabels:['You / Focus','Parents','Grandparents','Great-grandparents','GG-grandparents','GGG-grandparents'],
+    detParents:  'Parents',
+    detSpouse:   'Spouse',
+    detChildren: 'Children',
+    detSiblings: 'Siblings',
+    detNote:     'Note',
+    detEmpty:    'Select a person in the tree',
+    bildarkiv:      'Photo archive',
+    modalTitle:     '📷 Photo archive',
+    modalIntro:     'The family tree is open to everyone — but the family photos are reserved for family members. Fill in the form below and Lasse will get back to you within a few days.',
+    labelName:      'Your name',
+    phName:         'First Last',
+    labelEmail:     'Your Gmail address (used for sign-in)',
+    labelRelation:  'How are you related to the family?',
+    phRelation:     'E.g. I am the daughter of Lillemor Nilsson, so your cousin…',
+    btnApply:       'Send request',
+    btnCancel:      'Cancel',
+    btnClose:       'Close',
+    signinTitle:    '📷 Photo archive',
+    signinText:     'Sign in with your Google account to view the family photos.',
+    pendingTitle:   'Request sent!',
+    pendingText:    'Lasse will receive an email with your request and approve it from his phone. Next time you sign in with the same Google account you will get direct access.',
   }
 };
 let lang = 'sv';
@@ -1370,7 +1398,7 @@ function render(rootId) {
         sibsDiv.className = 'sibs';
         const sibsLbl = document.createElement('span');
         sibsLbl.className = 'section-lbl';
-        sibsLbl.textContent = lang === 'de' ? 'Geschwister:' : 'syskon:';
+        sibsLbl.textContent = lang === 'de' ? 'Geschwister:' : lang === 'en' ? 'siblings:' : 'syskon:';
         sibsDiv.appendChild(sibsLbl);
         const sibsChips = document.createElement('div');
         sibsChips.className = 'chips';
@@ -1398,7 +1426,7 @@ function render(rootId) {
         barnDiv.className = 'barn';
         const barnLbl = document.createElement('span');
         barnLbl.className = 'section-lbl';
-        barnLbl.textContent = lang === 'de' ? 'Kinder:' : 'barn:';
+        barnLbl.textContent = lang === 'de' ? 'Kinder:' : lang === 'en' ? 'children:' : 'barn:';
         barnDiv.appendChild(barnLbl);
         const barnChips = document.createElement('div');
         barnChips.className = 'chips';
