@@ -211,8 +211,7 @@ canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
 /* ── Lightbox ── */
 #photo-lightbox { display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:9000;align-items:center;justify-content:center;flex-direction:column; }
 #photo-lightbox.open { display:flex; }
-#lbx-img { max-width:90vw;max-height:80vh;object-fit:contain;border-radius:4px; }
-#lbx-caption { margin-top:12px;color:#ccc;font-size:13px;text-align:center;max-width:80vw; }
+#lbx-caption { color:#ccc;font-size:13px;text-align:center;max-width:80vw; }
 #lbx-close { position:absolute;top:14px;right:18px;color:#fff;font-size:28px;cursor:pointer;line-height:1;background:none;border:none; }
 #lbx-prev, #lbx-next { position:absolute;top:50%;transform:translateY(-50%);color:#fff;font-size:40px;cursor:pointer;background:none;border:none;padding:10px;opacity:0.7;line-height:1; }
 #lbx-prev { left:6px; }
@@ -1202,9 +1201,13 @@ async function renderDetail(id) {
       items.forEach((item, idx) => {
         const url   = typeof item === 'string' ? item : item.url;
         const label = typeof item === 'string' ? `Foto ${idx + 1}` : (item.text || `Foto ${idx + 1}`);
-        html += `<div class="photo-thumb-item" onclick="openLightbox('${id}',${idx})" title="${label.replace(/'/g,'&#39;')}">
-          <img src="${url}" alt="${label.replace(/"/g,'&quot;')}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-          <div class="photo-thumb-fallback">📷</div>
+        const safeLabel = label.replace(/'/g,"&#39;").replace(/"/g,'&quot;');
+        html += `<div class="photo-thumb-item" onclick="openLightbox('${id}',${idx})" title="${safeLabel}">
+          <img src="${url}" alt="${safeLabel}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="photo-thumb-fallback" style="flex-direction:column;gap:3px;padding:4px;text-align:center">
+            <span style="font-size:20px">📷</span>
+            <span style="font-size:9px;color:#666;line-height:1.2;word-break:break-word">${label.length > 18 ? label.slice(0,16)+'…' : label}</span>
+          </div>
           ${isAdmin ? `<button class="photo-thumb-del" onclick="event.stopPropagation();deleteAdminPhoto('${id}',${idx})" title="Ta bort">✕</button>` : ''}
         </div>`;
       });
@@ -1361,9 +1364,20 @@ function ensureLightbox() {
   div.innerHTML =
     `<button id="lbx-close" onclick="closeLightbox()">✕</button>
      <button id="lbx-prev" onclick="lbxNav(-1)">&#8249;</button>
-     <img id="lbx-img" src="" alt="">
-     <button id="lbx-next" onclick="lbxNav(1)">&#8250;</button>
-     <div id="lbx-caption"></div>`;
+     <div id="lbx-content" style="display:flex;flex-direction:column;align-items:center;gap:14px;max-width:90vw">
+       <img id="lbx-img" src="" alt="" style="max-width:90vw;max-height:75vh;object-fit:contain;border-radius:4px;display:block">
+       <div id="lbx-fallback" style="display:none;flex-direction:column;align-items:center;gap:14px;color:#ddd">
+         <div style="font-size:48px">📷</div>
+         <div id="lbx-fallback-label" style="font-size:14px;color:#bbb;text-align:center"></div>
+         <a id="lbx-open-link" href="" target="_blank" rel="noopener"
+            style="padding:10px 22px;background:#5ab6e0;color:#fff;text-decoration:none;border-radius:8px;font-size:14px;font-weight:600">
+           Öppna foto &#8599;
+         </a>
+         <div style="font-size:11px;color:#666;text-align:center">Bilden kan inte visas direkt – klicka för att öppna i nytt fönster</div>
+       </div>
+       <div id="lbx-caption" style="color:#ccc;font-size:13px;text-align:center"></div>
+     </div>
+     <button id="lbx-next" onclick="lbxNav(1)">&#8250;</button>`;
   div.addEventListener('click', e => { if (e.target === div) closeLightbox(); });
   document.body.appendChild(div);
 }
@@ -1381,9 +1395,25 @@ window.openLightbox = function(pid, idx) {
 function showLbxSlide() {
   const item = lbxItems[lbxIdx];
   if (!item) return;
-  document.getElementById('lbx-img').src = item.url;
-  document.getElementById('lbx-caption').textContent =
-    item.label ? `${item.label}  (${lbxIdx+1}/${lbxItems.length})` : `${lbxIdx+1} / ${lbxItems.length}`;
+  const img     = document.getElementById('lbx-img');
+  const fallback = document.getElementById('lbx-fallback');
+  const caption  = document.getElementById('lbx-caption');
+  const counter  = item.label ? `${item.label}  (${lbxIdx+1}/${lbxItems.length})` : `${lbxIdx+1} / ${lbxItems.length}`;
+
+  // Reset state
+  img.style.display = 'block';
+  fallback.style.display = 'none';
+  img.src = '';
+
+  img.onerror = () => {
+    img.style.display = 'none';
+    fallback.style.display = 'flex';
+    document.getElementById('lbx-fallback-label').textContent = item.label || '';
+    document.getElementById('lbx-open-link').href = item.url;
+  };
+  img.src = item.url;
+
+  caption.textContent = counter;
   document.getElementById('lbx-prev').style.display = lbxItems.length > 1 ? '' : 'none';
   document.getElementById('lbx-next').style.display = lbxItems.length > 1 ? '' : 'none';
   document.getElementById('photo-lightbox').classList.add('open');
