@@ -202,6 +202,23 @@ canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
 .det-photo-del:hover { color: #e06060; }
 .det-photo-add { margin-top: 6px; font-size: 12px; }
 
+/* ── Foto-miniatyrer ── */
+.photo-thumb-grid { display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px; }
+.photo-thumb-item { position:relative;width:72px;height:72px;border-radius:6px;overflow:hidden;background:#f0f0f0;cursor:pointer;flex-shrink:0; }
+.photo-thumb-item img { width:100%;height:100%;object-fit:cover; }
+.photo-thumb-fallback { display:none;width:100%;height:100%;align-items:center;justify-content:center;font-size:22px; }
+.photo-thumb-del { position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.5);color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0; }
+/* ── Lightbox ── */
+#photo-lightbox { display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:9000;align-items:center;justify-content:center;flex-direction:column; }
+#photo-lightbox.open { display:flex; }
+#lbx-img { max-width:90vw;max-height:80vh;object-fit:contain;border-radius:4px; }
+#lbx-caption { margin-top:12px;color:#ccc;font-size:13px;text-align:center;max-width:80vw; }
+#lbx-close { position:absolute;top:14px;right:18px;color:#fff;font-size:28px;cursor:pointer;line-height:1;background:none;border:none; }
+#lbx-prev, #lbx-next { position:absolute;top:50%;transform:translateY(-50%);color:#fff;font-size:40px;cursor:pointer;background:none;border:none;padding:10px;opacity:0.7;line-height:1; }
+#lbx-prev { left:6px; }
+#lbx-next { right:6px; }
+#lbx-prev:hover, #lbx-next:hover { opacity:1; }
+
 /* ── Fotoikon på kort ── */
 .photo-dot {
   position: absolute; top: 3px; right: 5px;
@@ -1181,14 +1198,17 @@ async function renderDetail(id) {
     if (items.length === 0) {
       html += `<div class="det-note" style="margin-bottom:6px">Inga foton kopplade ännu.</div>`;
     } else {
+      html += `<div class="photo-thumb-grid">`;
       items.forEach((item, idx) => {
         const url   = typeof item === 'string' ? item : item.url;
         const label = typeof item === 'string' ? `Foto ${idx + 1}` : (item.text || `Foto ${idx + 1}`);
-        html += `<div class="det-photo-row">
-          <a class="det-photo-lnk" href="${url}" target="_blank" rel="noopener">📷 ${label}</a>
-          ${isAdmin ? `<button class="det-photo-del" onclick="deleteAdminPhoto('${id}',${idx})" title="Ta bort">✕</button>` : ''}
+        html += `<div class="photo-thumb-item" onclick="openLightbox('${id}',${idx})" title="${label.replace(/'/g,'&#39;')}">
+          <img src="${url}" alt="${label.replace(/"/g,'&quot;')}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="photo-thumb-fallback">📷</div>
+          ${isAdmin ? `<button class="photo-thumb-del" onclick="event.stopPropagation();deleteAdminPhoto('${id}',${idx})" title="Ta bort">✕</button>` : ''}
         </div>`;
       });
+      html += `</div>`;
     }
     html += `</div>
       <button class="det-link det-photo-add" onclick="showAddPhotoForm('${id}')">＋ Lägg till foto</button>
@@ -1293,7 +1313,7 @@ const focusName = document.getElementById('focus-name');
 // ════ FOCUS ════
 function focusPerson(id) {
   if (!P[id] || id === currentRoot) return;
-  hist.push(currentRoot);
+  hist.push({id: currentRoot, zoom, scrollLeft: viewport.scrollLeft, scrollTop: viewport.scrollTop});
   currentRoot = id;
   const doRender = () => { render(id); renderDetail(id); };
   if (document.startViewTransition) {
@@ -1310,9 +1330,15 @@ function focusPerson(id) {
 backBtn.addEventListener('click', () => {
   if (!hist.length) return;
   const prev = hist.pop();
-  currentRoot = prev;
-  render(prev);
-  renderDetail(prev);
+  currentRoot = prev.id;
+  render(prev.id);
+  renderDetail(prev.id);
+  zoom = prev.zoom;
+  applyZoom();
+  requestAnimationFrame(() => {
+    viewport.scrollLeft = prev.scrollLeft;
+    viewport.scrollTop  = prev.scrollTop;
+  });
   backBtn.disabled = hist.length === 0;
 });
 
@@ -1324,6 +1350,60 @@ function goHome() {
   renderDetail('lasse');
   backBtn.disabled = true;
 }
+
+// ════ LIGHTBOX ════
+let lbxItems = [], lbxIdx = 0;
+
+function ensureLightbox() {
+  if (document.getElementById('photo-lightbox')) return;
+  const div = document.createElement('div');
+  div.id = 'photo-lightbox';
+  div.innerHTML =
+    `<button id="lbx-close" onclick="closeLightbox()">✕</button>
+     <button id="lbx-prev" onclick="lbxNav(-1)">&#8249;</button>
+     <img id="lbx-img" src="" alt="">
+     <button id="lbx-next" onclick="lbxNav(1)">&#8250;</button>
+     <div id="lbx-caption"></div>`;
+  div.addEventListener('click', e => { if (e.target === div) closeLightbox(); });
+  document.body.appendChild(div);
+}
+
+window.openLightbox = function(pid, idx) {
+  lbxItems = (PHOTOS[pid] || []).map(item => ({
+    url:   typeof item === 'string' ? item : item.url,
+    label: typeof item === 'string' ? '' : (item.text || '')
+  }));
+  lbxIdx = idx;
+  ensureLightbox();
+  showLbxSlide();
+};
+
+function showLbxSlide() {
+  const item = lbxItems[lbxIdx];
+  if (!item) return;
+  document.getElementById('lbx-img').src = item.url;
+  document.getElementById('lbx-caption').textContent =
+    item.label ? `${item.label}  (${lbxIdx+1}/${lbxItems.length})` : `${lbxIdx+1} / ${lbxItems.length}`;
+  document.getElementById('lbx-prev').style.display = lbxItems.length > 1 ? '' : 'none';
+  document.getElementById('lbx-next').style.display = lbxItems.length > 1 ? '' : 'none';
+  document.getElementById('photo-lightbox').classList.add('open');
+}
+
+function closeLightbox() {
+  document.getElementById('photo-lightbox')?.classList.remove('open');
+}
+
+function lbxNav(dir) {
+  lbxIdx = (lbxIdx + dir + lbxItems.length) % lbxItems.length;
+  showLbxSlide();
+}
+
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('photo-lightbox')?.classList.contains('open')) return;
+  if (e.key === 'Escape') closeLightbox();
+  else if (e.key === 'ArrowLeft')  lbxNav(-1);
+  else if (e.key === 'ArrowRight') lbxNav(1);
+});
 
 // ════ TOAST ════
 let toastTimer = null;
@@ -1417,9 +1497,9 @@ function showAddPhotoForm(personId) {
   const checkboxes = sorted.map(([id, p]) => {
     const col = COLORS[p.c] || '#bbb';
     const checked = id === personId ? 'checked' : '';
-    return `<label class="photo-person-row" style="display:flex;align-items:center;gap:7px;padding:3px 0;cursor:pointer;font-size:12px">
-      <input type="checkbox" name="photo-persons" value="${id}" ${checked} onchange="filterPhotoPersons()" style="accent-color:${col}">
-      <span style="width:9px;height:9px;border-radius:50%;background:${col};flex-shrink:0;display:inline-block"></span>
+    return `<label class="photo-person-row" style="display:flex;align-items:center;gap:5px;padding:1px 0;cursor:pointer;font-size:11px">
+      <input type="checkbox" name="photo-persons" value="${id}" ${checked} onchange="filterPhotoPersons()" style="accent-color:${col};width:13px;height:13px">
+      <span style="width:7px;height:7px;border-radius:50%;background:${col};flex-shrink:0;display:inline-block"></span>
       ${p.n}${p.b ? ` <span style="color:#bbb;font-size:10px">*${p.b}</span>` : ''}
     </label>`;
   }).join('');
