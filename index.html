@@ -1365,22 +1365,44 @@ function showAddPhotoForm(personId) {
   const admin = document.getElementById('det-photo-admin');
   if (!admin) return;
   admin.querySelector('.det-photo-add').style.display = 'none';
+
+  // Bygg personlista sorterad på födelseår, aktuell person förkryssad
+  const sorted = Object.entries(P)
+    .filter(([, p]) => p.n)
+    .sort(([, a], [, b]) => birthYear(a) - birthYear(b));
+
+  const checkboxes = sorted.map(([id, p]) => {
+    const col = COLORS[p.c] || '#bbb';
+    const checked = id === personId ? 'checked' : '';
+    return `<label style="display:flex;align-items:center;gap:7px;padding:3px 0;cursor:pointer;font-size:12px">
+      <input type="checkbox" name="photo-persons" value="${id}" ${checked} style="accent-color:${col}">
+      <span style="width:9px;height:9px;border-radius:50%;background:${col};flex-shrink:0;display:inline-block"></span>
+      ${p.n}${p.b ? ` <span style="color:#bbb;font-size:10px">*${p.b}</span>` : ''}
+    </label>`;
+  }).join('');
+
   const form = document.createElement('div');
   form.id = 'add-photo-form';
   form.style.marginTop = '8px';
   form.innerHTML = `
     <div class="apply-field" style="margin-bottom:7px">
       <label>Länk till bilden</label>
-      <div style="font-size:11px;color:#aaa;margin-bottom:5px;line-height:1.5">Klistra in en <strong>offentlig delningslänk</strong> — det går inte att ladda upp bilder direkt här. Dela bilden från t.ex. Google Photos, iCloud eller Dropbox och kopiera länken därifrån.</div>
+      <div style="font-size:11px;color:#aaa;margin-bottom:5px;line-height:1.5">Klistra in en <strong>offentlig delningslänk</strong> — foton kan inte laddas upp direkt. Dela från Google Photos, iCloud eller Dropbox och kopiera länken.</div>
       <input id="new-photo-url" type="url" placeholder="https://photos.google.com/photo/…">
     </div>
     <div class="apply-field" style="margin-bottom:8px">
       <label>Bildtext (valfri)</label>
-      <input id="new-photo-text" type="text" placeholder="T.ex. Deportationshandling 1945">
+      <input id="new-photo-text" type="text" placeholder="T.ex. Familjeporträtt 1952">
+    </div>
+    <div class="apply-field" style="margin-bottom:10px">
+      <label>Koppla till personer <span style="font-weight:400;color:#aaa">(kryssa i alla som är med)</span></label>
+      <div style="max-height:180px;overflow-y:auto;border:1px solid #eee;border-radius:6px;padding:6px 10px;margin-top:4px;background:#fafafa">
+        ${checkboxes}
+      </div>
     </div>
     <div style="display:flex;gap:8px">
       <button class="det-link" style="background:#5ab6e0;color:#fff;border-color:#5ab6e0"
-              onclick="saveAdminPhoto('${personId}')">Spara</button>
+              onclick="saveMultiPhoto('${personId}')">Spara</button>
       <button class="det-link" onclick="renderDetail('${personId}')">Avbryt</button>
     </div>
     <div id="add-photo-status" style="font-size:11px;margin-top:6px;min-height:16px"></div>`;
@@ -1407,6 +1429,38 @@ async function saveAdminPhoto(personId) {
     PHOTOS[personId].push(text ? {url, text} : url);
     showToast(`📷 Foto sparat`);
     renderDetail(personId);
+  } catch(e) {
+    status.textContent = `Fel: ${e.message}`; status.style.color = '#e06060';
+  }
+}
+
+async function saveMultiPhoto(originPersonId) {
+  const url    = (document.getElementById('new-photo-url').value || '').trim();
+  const text   = (document.getElementById('new-photo-text').value || '').trim();
+  const status = document.getElementById('add-photo-status');
+  if (!url) { status.textContent = 'Klistra in en URL.'; status.style.color = '#e06060'; return; }
+
+  const checked = [...document.querySelectorAll('input[name="photo-persons"]:checked')]
+    .map(el => el.value);
+  if (!checked.length) { status.textContent = 'Välj minst en person.'; status.style.color = '#e06060'; return; }
+
+  status.textContent = `Sparar till ${checked.length} person${checked.length > 1 ? 'er' : ''}…`;
+  status.style.color = '#888';
+
+  try {
+    await Promise.all(checked.map(pid =>
+      fetch(
+        `${APPS_SCRIPT_URL}?action=save_photo&personId=${encodeURIComponent(pid)}`
+        + `&url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`
+        + `&token=${encodeURIComponent(authToken)}`
+      ).then(r => r.json()).then(d => {
+        if (!d.ok) throw new Error(d.error || 'Okänt fel');
+        if (!PHOTOS[pid]) PHOTOS[pid] = [];
+        PHOTOS[pid].push(text ? {url, text} : url);
+      })
+    ));
+    showToast(`📷 Foto kopplat till ${checked.length} person${checked.length > 1 ? 'er' : ''}`);
+    renderDetail(originPersonId);
   } catch(e) {
     status.textContent = `Fel: ${e.message}`; status.style.color = '#e06060';
   }
