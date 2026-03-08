@@ -1163,19 +1163,19 @@ async function renderDetail(id) {
     html += `<div class="det-section"><button class="photos-link" onclick="openPhotoSearch('${id}')">📷 Se foton i Google Photos</button></div>`;
   }
 
-  // Admin: textredigering
+  // Admin: liten redigera-knapp + dold editor
   if (isAdmin && db) {
-    html += `<div class="det-section" id="det-edit-section">
-      <h4 style="margin-bottom:8px">✏️ Redigera text</h4>
+    html += `<button id="det-edit-toggle" onclick="document.getElementById('det-edit-form').style.display='';this.style.display='none'" style="margin:4px 0 10px;padding:3px 10px;font-size:11px;color:#aaa;background:none;border:1px solid #ddd;border-radius:5px;cursor:pointer">✏️ Redigera</button>
+    <div id="det-edit-form" style="display:none">
       <div style="font-size:11px;color:#aaa;margin-bottom:4px">Svenska</div>
       <textarea id="det-edit-sv" style="width:100%;min-height:70px;font-size:12px;padding:6px;border:1px solid #ddd;border-radius:6px;font-family:inherit;resize:vertical;margin-bottom:6px">${(p.desc||'').replace(/</g,'&lt;')}</textarea>
-      <div style="font-size:11px;color:#aaa;margin-bottom:4px">Tyska (desc_de)</div>
+      <div style="font-size:11px;color:#aaa;margin-bottom:4px">Tyska</div>
       <textarea id="det-edit-de" style="width:100%;min-height:70px;font-size:12px;padding:6px;border:1px solid #ddd;border-radius:6px;font-family:inherit;resize:vertical;margin-bottom:6px">${(p.desc_de||'').replace(/</g,'&lt;')}</textarea>
-      <div style="font-size:11px;color:#aaa;margin-bottom:4px">Engelska (desc_en, lämna tom = auto-translate)</div>
+      <div style="font-size:11px;color:#aaa;margin-bottom:4px">Engelska (tom = auto-translate)</div>
       <textarea id="det-edit-en" style="width:100%;min-height:70px;font-size:12px;padding:6px;border:1px solid #ddd;border-radius:6px;font-family:inherit;resize:vertical;margin-bottom:8px">${(p.desc_en||'').replace(/</g,'&lt;')}</textarea>
       <div style="display:flex;gap:8px">
         <button onclick="doSaveDesc('${id}')" style="padding:5px 14px;background:#333;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">Spara</button>
-        <button onclick="document.getElementById('det-edit-section').style.display='none'" style="padding:5px 12px;background:#eee;border:none;border-radius:6px;cursor:pointer;font-size:12px">Dölj</button>
+        <button onclick="document.getElementById('det-edit-form').style.display='none';document.getElementById('det-edit-toggle').style.display=''" style="padding:5px 12px;background:#eee;border:none;border-radius:6px;cursor:pointer;font-size:12px">Avbryt</button>
       </div>
     </div>`;
   }
