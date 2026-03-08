@@ -1958,9 +1958,16 @@ window.handleCredentialResponse = async function(response) {
     isAdmin = authUser.email.toLowerCase() === LASSE_EMAIL_CLIENT;
     closeApplyModal();
     renderPhotoIndicators();
-    renderDetail(currentRoot);
     if (isAdmin)
       document.getElementById('admin-btn').style.display = '';
+
+    // Centrera trädet på den inloggade personen om de finns i trädet
+    const matchedId = matchUserToTree(authUser.name);
+    if (matchedId && matchedId !== currentRoot) {
+      focusPerson(matchedId); // renderar träd + panel automatiskt
+    } else {
+      renderDetail(currentRoot);
+    }
   } else {
     // Inloggad men ej godkänd: visa ansökningsformuläret (med namn förifyllt från Google)
     const nameEl = document.getElementById('apply-name');
@@ -1971,6 +1978,29 @@ window.handleCredentialResponse = async function(response) {
     showApplyView('request');
   }
 };
+
+// ════ MATCHA INLOGGAD ANVÄNDARE MOT PERSON I TRÄDET ════
+function matchUserToTree(fullName) {
+  const nl = fullName.toLowerCase().trim();
+  const fn = nl.split(' ')[0]; // förnamn
+
+  // Kandidater: levande/nutida personer (inget dödsår, födda 1930–2010)
+  const candidates = Object.entries(P).filter(([id, p]) => {
+    if (p.d) return false;
+    const by = birthYear(p);
+    return by >= 1930 && by < 2010;
+  });
+
+  // 1. Exakt fullnamnsmatch
+  const exact = candidates.find(([, p]) => p.n.toLowerCase() === nl);
+  if (exact) return exact[0];
+
+  // 2. Förnamns­match
+  const first = candidates.find(([, p]) => p.n.toLowerCase().split(' ')[0] === fn);
+  if (first) return first[0];
+
+  return null;
+}
 
 // ════ UTLOGGNING ════
 function signOut() {
