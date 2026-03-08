@@ -3,846 +3,1961 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Stamtavla – Lasse Nilsson</title>
-
-<!-- Firebase (optional – fill in CONFIG below to enable comments & editing) -->
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-
+<title>Stavla – Interaktiv stamtavla</title>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: #eae6e0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
 
-/* ── Header ── */
-header {
-  padding: 22px 40px 14px;
-  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
-}
-header h1 { font-size: 21px; font-weight: 700; color: #333; }
-.subtitle  { font-size: 13px; color: #888; flex: 1; margin-left: 10px; }
-.controls  { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+body { background: #eae6e0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 
-.flag-btn {
-  background: none; border: none; cursor: pointer;
-  font-size: 22px; line-height: 1; padding: 2px 3px; border-radius: 6px;
-  opacity: 0.35; transition: opacity .15s, transform .15s;
+#topbar {
+  flex-shrink: 0; background: #fff; border-bottom: 1px solid #ddd;
+  padding: 10px 20px; display: flex; align-items: center; gap: 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.08);
 }
-.flag-btn:hover   { opacity: 0.7; transform: scale(1.1); }
-.flag-btn.active  { opacity: 1;   transform: scale(1.12); }
+#topbar h1 { font-size: 16px; font-weight: 700; color: #333; }
+#focus-name { font-size: 14px; color: #666; flex: 1; }
+#back { padding: 6px 14px; border-radius: 20px; border: 1.5px solid #ccc; background: white; font-size: 13px; cursor: pointer; color: #555; transition: background .1s; }
+#back:hover:not(:disabled) { background: #f0f0f0; }
+#back:disabled { opacity: .35; cursor: default; }
+.hint { font-size: 11px; color: #bbb; white-space: nowrap; }
 
-#auth-btn {
-  padding: 5px 14px; border-radius: 20px; border: 1.5px solid #4285F4;
-  background: white; cursor: pointer; font-size: 13px; font-weight: 600; color: #4285F4;
-}
-#auth-btn:hover { background: #4285F4; color: white; }
-#user-label { font-size: 12px; color: #777; display: flex; align-items: center; gap: 6px; }
-#user-avatar { width: 26px; height: 26px; border-radius: 50%; }
+#viewport { flex: 1; overflow: auto; position: relative; touch-action: pan-x pan-y; }
 
-/* ── Legend ── */
-.legend { display: flex; gap: 18px; flex-wrap: wrap; padding: 0 40px 18px; }
-.leg { display: flex; align-items: center; gap: 7px; font-size: 12px; color: #555; }
-.leg-dot { width: 13px; height: 13px; border-radius: 50%; border: 2.5px solid; }
+#wrap { position: relative; }
 
-/* ── Chart viewport (zoom/pan) ── */
-.chart-viewport {
-  margin: 0 40px;
-  height: 620px;
-  overflow: hidden;
-  border-radius: 12px;
-  border: 1.5px solid #ccc;
-  background: #f5f2ed;
-  cursor: grab;
-  user-select: none;
-  position: relative;
-}
-.chart-viewport.dragging { cursor: grabbing; }
-.chart-pan { transform-origin: 0 0; display: inline-block; }
+canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
 
-.chart {
-  position: relative;
-  width: 1220px;
-  height: 1380px;
-}
-svg#lines {
-  position: absolute; inset: 0;
-  width: 100%; height: 100%;
-  pointer-events: none; overflow: visible;
-}
-
-/* Zoom controls overlay */
-.zoom-controls {
-  position: absolute; bottom: 10px; left: 12px;
-  display: flex; gap: 4px; z-index: 5;
-}
-.zoom-controls button {
-  width: 30px; height: 30px; border-radius: 7px; border: 1px solid #ccc;
-  background: rgba(255,255,255,.9); cursor: pointer; font-size: 17px; font-weight: 700;
-  color: #555; display: flex; align-items: center; justify-content: center;
-  line-height: 1;
-}
-.zoom-controls button:last-child { font-size: 12px; width: auto; padding: 0 8px; }
-.zoom-controls button:hover { background: #eee; }
-.zoom-hint {
-  position: absolute; bottom: 14px; right: 12px;
-  font-size: 11px; color: #aaa; pointer-events: none; z-index: 5;
-}
-
-/* ── Cards ── */
+/* ── Card ── */
 .card {
-  position: absolute;
-  display: flex; align-items: center; gap: 9px;
-  padding: 7px 12px 7px 7px;
-  border-radius: 60px; border: 2.5px solid; width: 208px;
-  transform: translateY(-50%);
+  position: absolute; display: flex; flex-direction: column;
+  padding: 5px 8px 5px 6px; border-radius: 14px; border: 2px solid;
+  width: 168px; transform: translateY(-50%);
   background: white; cursor: pointer;
-  transition: filter .15s, box-shadow .15s;
+  transition: filter .12s, box-shadow .12s;
 }
-.card:hover  { filter: brightness(.97); box-shadow: 0 3px 10px rgba(0,0,0,.13); z-index: 10; }
-.card.active { box-shadow: 0 0 0 3px rgba(0,0,0,.25); z-index: 20; }
+.card:hover { filter: brightness(.96); box-shadow: 0 3px 12px rgba(0,0,0,.14); z-index: 5; }
+.card.focused { box-shadow: 0 0 0 3px rgba(100,80,200,.35); z-index: 6; cursor: default; }
 
-.av {
-  width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
+.card-top { display: flex; align-items: flex-start; gap: 5px; }
+.av { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 12px; color: white; margin-top: 1px; }
+
+.info { flex: 1; min-width: 0; }
+.nm { font-size: 11px; font-weight: 700; color: #222; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dt { font-size: 9.5px; color: #888; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.note { font-size: 9px; color: #aaa; font-style: italic; }
+
+.sibs { margin-top: 5px; padding-top: 4px; border-top: 1px solid rgba(0,0,0,.07); display: flex; align-items: flex-start; gap: 5px; }
+.sib { font-size: 10px; padding: 2px 7px; border-radius: 10px; border: 1px solid; cursor: pointer; white-space: nowrap; transition: filter .1s; background: white; }
+.sib:hover { filter: brightness(.92); }
+
+/* Colour themes */
+.c-sv   { border-color: #5ab6e0; background: #eaf5fc; } .c-sv   .av { background: #5ab6e0; }
+.c-svb  { border-color: #52bb52; background: #eafaea; } .c-svb  .av { background: #52bb52; }
+.c-rs   { border-color: #e06060; background: #fbeaea; } .c-rs   .av { background: #e06060; }
+.c-de   { border-color: #d0b040; background: #fdf8e0; } .c-de   .av { background: #d0b040; }
+.c-mix  { border-color: #9060d0; background: #f4eefb; } .c-mix  .av { background: #9060d0; }
+.c-unk  { border-color: #bbb;    background: #f7f7f7; } .c-unk  .av { background: #bbb;    }
+.c-unk .nm { color: #999; font-style: italic; }
+
+/* Sibling chip colours */
+.sib-sv  { border-color: #5ab6e0; color: #2a7090; }
+.sib-svb { border-color: #52bb52; color: #2a6030; }
+.sib-rs  { border-color: #e06060; color: #903030; }
+.sib-de  { border-color: #d0b040; color: #705010; }
+.sib-mix { border-color: #9060d0; color: #503090; }
+.sib-unk { border-color: #bbb;    color: #888;    }
+.barn { margin-top: 4px; padding-top: 4px; border-top: 1px dashed rgba(0,0,0,.1);
+        display: flex; align-items: flex-start; gap: 5px; }
+.section-lbl { font-size: 10px; font-weight: 700; color: #ccc; white-space: nowrap; flex-shrink: 0; width: 28px; text-align: right; padding-top: 3px; }
+.chips { display: flex; flex-wrap: wrap; gap: 3px; justify-content: flex-end; }
+
+/* Language toggle */
+#lang-toggle { display: flex; gap: 3px; margin-left: 8px; }
+.lang-btn { font-size: 17px; background: none; border: 2px solid transparent;
+            border-radius: 6px; padding: 1px 4px; cursor: pointer;
+            opacity: .4; line-height: 1; transition: opacity .1s; }
+.lang-btn:hover { opacity: .75; }
+.lang-btn.active { border-color: #bbb; opacity: 1; }
+.child { font-size: 10px; padding: 2px 7px; border-radius: 10px; cursor: pointer;
+         white-space: nowrap; transition: filter .1s; border: none; }
+.child:hover { filter: brightness(.88); }
+.child-sv   { background: #cce8f5; color: #1a608a; }
+.child-svb  { background: #c8eec8; color: #1a5a1a; }
+.child-rs   { background: #f5cccc; color: #8a1a1a; }
+.child-de   { background: #f5e8a0; color: #6a4a00; }
+.child-mix  { background: #dcc8f5; color: #4a1a9a; }
+.child-unk  { background: #e0e0e0; color: #555; }
+
+
+/* Gen labels */
+.gen-lbl { position: absolute; top: 10px; font-size: 10px; font-weight: 700; letter-spacing: .5px; color: #bbb; text-transform: uppercase; white-space: nowrap; pointer-events: none; }
+
+/* ── Main layout ── */
+#main { flex: 1; display: flex; overflow: hidden; }
+#zoom-layer { position: relative; }
+
+/* ── Zoom controls ── */
+#zoom-controls {
+  position: fixed; bottom: 22px; left: 18px; z-index: 20;
+  display: flex; flex-direction: column; gap: 5px;
+}
+.zoom-btn {
+  width: 38px; height: 38px; border-radius: 50%;
+  border: 1.5px solid #ccc; background: white;
+  font-size: 22px; font-weight: 300; line-height: 1; padding: 0;
+  cursor: pointer; color: #555;
+  box-shadow: 0 2px 8px rgba(0,0,0,.13);
   display: flex; align-items: center; justify-content: center;
-  font-size: 17px; color: white;
+  transition: background .1s;
 }
-.info { flex: 1; overflow: hidden; }
-.nm  { font-size: 12.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #222; }
-.dt  { font-size: 11px; color: #777; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.zoom-btn:hover { background: #f0f0f0; }
 
-.sv  { border-color: #5ab6e0; background: #eaf5fc; } .sv  .av { background: #5ab6e0; }
-.svb { border-color: #52bb52; background: #eafaea; } .svb .av { background: #52bb52; }
-.rs  { border-color: #e06060; background: #fbeaea; } .rs  .av { background: #e06060; }
-.de  { border-color: #d0b040; background: #fdf8e0; } .de  .av { background: #d0b040; }
-.mix { border-color: #9060d0; background: #f4eefb; } .mix .av { background: #9060d0; }
-.unk { border-color: #bbb;    background: #f7f7f7; } .unk .av { background: #bbb; }
-.unk .nm { color: #999; font-style: italic; font-weight: 500; }
-
-.gen-label {
-  position: absolute; top: 16px;
-  font-size: 10.5px; font-weight: 700; letter-spacing: .5px;
-  color: #aaa; text-transform: uppercase; white-space: nowrap;
+/* ── Detail panel ── */
+#detail {
+  width: 272px; flex-shrink: 0;
+  background: #fafafa; border-left: 1px solid #ddd;
+  display: flex; flex-direction: column; overflow: hidden;
+  transition: width .2s ease;
 }
-
-/* ── Detail panel (right side, NO backdrop/dimming) ── */
-#panel {
-  position: fixed; top: 0; right: -420px; width: 400px; height: 100vh;
-  background: white; box-shadow: -4px 0 24px rgba(0,0,0,.12);
-  display: flex; flex-direction: column;
-  transition: right .28s ease;
-  z-index: 1000;
-  overflow: hidden;
+#detail.collapsed { width: 0; }
+#det-close {
+  margin-left: auto; flex-shrink: 0;
+  background: none; border: none; font-size: 17px;
+  color: #bbb; cursor: pointer; padding: 0 2px; line-height: 1;
 }
-#panel.open { right: 0; }
-
-#panel-head {
-  padding: 18px 18px 14px;
-  border-bottom: 1px solid #eee;
-  display: flex; align-items: flex-start; gap: 12px;
-  flex-shrink: 0;
+#det-close:hover { color: #666; }
+.det-head {
+  padding: 14px 16px; display: flex; align-items: center; gap: 12px;
+  border-bottom: 1px solid #eee; flex-shrink: 0;
 }
-#panel-av {
-  width: 50px; height: 50px; border-radius: 50%; flex-shrink: 0;
+.det-av {
+  width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
   font-size: 20px; color: white;
 }
-#panel-head-text { flex: 1; }
-#panel-name  { font-size: 16px; font-weight: 700; color: #222; }
-#panel-dates { font-size: 13px; color: #777; margin-top: 2px; }
-#panel-close {
-  background: none; border: none; cursor: pointer;
-  font-size: 22px; color: #bbb; line-height: 1; flex-shrink: 0;
+.det-name { font-size: 13.5px; font-weight: 700; color: #222; line-height: 1.3; }
+.det-dates { font-size: 11.5px; color: #777; margin-top: 2px; }
+.det-body { flex: 1; overflow-y: auto; padding: 12px 14px; }
+.det-section { margin-bottom: 14px; }
+.det-section h4 {
+  font-size: 9.5px; font-weight: 700; letter-spacing: .6px;
+  text-transform: uppercase; color: #bbb; margin-bottom: 6px;
 }
-#panel-close:hover { color: #444; }
+.det-links { display: flex; flex-wrap: wrap; gap: 4px; }
+.det-link {
+  font-size: 11.5px; padding: 3px 9px; border-radius: 10px;
+  border: 1px solid #ddd; background: white; cursor: pointer; color: #333;
+  transition: background .1s;
+}
+.det-link:hover { background: #efefef; }
+/* ── Barn / Syskon — etikett i linje med cirkeln, namn för sig ── */
+.det-rels  { display: flex; gap: 8px; margin-bottom: 14px; align-items: flex-start; }
+.rel-label { font-size: 9.5px; font-weight: 700; letter-spacing: .6px;
+             text-transform: uppercase; color: #bbb;
+             white-space: nowrap; padding-top: 4px; min-width: 54px; }
+.rel-list  { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.rel-item  { display: flex; align-items: center; gap: 3px; }
+.rel-sex   { font-size: 10px; color: #999; }
 
-#panel-body { flex: 1; overflow-y: auto; padding: 18px; }
+.det-text { font-size: 12px; color: #444; line-height: 1.6; }
+.det-note { font-size: 11px; color: #999; font-style: italic; margin-top: 5px; }
+.det-empty { font-size: 12px; color: #ccc; font-style: italic; padding: 20px 0; text-align: center; }
 
-#panel-bio    { font-size: 14px; color: #444; line-height: 1.7; margin-bottom: 14px; }
-#panel-sibs   { font-size: 13px; color: #777; margin-bottom: 18px; }
-#panel-sibs strong { display: block; font-size: 10.5px; color: #bbb; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 3px; }
+/* ── Auth-zon i topbaren ── */
+#auth-zone { display:flex; align-items:center; gap:8px; }
+#auth-open-btn {
+  padding: 5px 13px; border-radius: 20px;
+  border: 1.5px solid #5ab6e0; background: white;
+  font-size: 12px; cursor: pointer; color: #3a80a0;
+  transition: background .1s; white-space: nowrap;
+}
+#auth-open-btn:hover { background: #eaf5fc; }
+#user-chip {
+  display: none; align-items: center; gap: 7px;
+  padding: 3px 10px 3px 4px; border-radius: 20px;
+  border: 1.5px solid #ddd; background: white; font-size: 12px; color: #444;
+}
+#user-pic { width: 22px; height: 22px; border-radius: 50%; }
+#sign-out-btn { background:none; border:none; font-size:11px; color:#ccc; cursor:pointer; padding:0 0 0 4px; }
+#sign-out-btn:hover { color: #e06060; }
 
-/* Admin edit */
-#edit-btn {
-  display: none; align-items: center; gap: 5px;
-  padding: 5px 12px; border-radius: 6px; border: 1px solid #ddd;
-  background: #fafafa; cursor: pointer; font-size: 12px; color: #666;
-  margin-bottom: 14px;
+/* ── Admin-fotolista i detaljpanelen ── */
+.det-photo-row {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 4px;
 }
-#edit-btn:hover { background: #eee; }
-#edit-form { display: none; margin-bottom: 16px; }
-#edit-form label { font-size: 11px; color: #aaa; text-transform: uppercase; letter-spacing: .4px; display: block; margin: 10px 0 4px; }
-#edit-form textarea {
-  width: 100%; min-height: 75px; padding: 8px; border: 1px solid #ddd;
-  border-radius: 6px; font-size: 13px; resize: vertical; font-family: inherit; color: #333;
+.det-photo-lnk {
+  flex: 1; font-size: 12px; color: #5ab6e0; text-decoration: none;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.edit-actions { display: flex; gap: 8px; margin-top: 8px; }
-.edit-actions button { padding: 6px 14px; border-radius: 6px; border: none; cursor: pointer; font-size: 13px; }
-#edit-save   { background: #333; color: white; }
-#edit-cancel { background: #eee; color: #555; }
+.det-photo-lnk:hover { text-decoration: underline; }
+.det-photo-del {
+  background: none; border: none; color: #ccc; cursor: pointer;
+  font-size: 13px; padding: 0 2px; line-height: 1; flex-shrink: 0;
+}
+.det-photo-del:hover { color: #e06060; }
+.det-photo-add { margin-top: 6px; font-size: 12px; }
 
-/* Comments */
-.sec-title {
-  font-size: 11px; font-weight: 700; color: #bbb; text-transform: uppercase;
-  letter-spacing: .5px; margin: 4px 0 12px; padding-top: 12px;
-  border-top: 1px solid #f0f0f0;
+/* ── Fotoikon på kort ── */
+.photo-dot {
+  position: absolute; top: 3px; right: 5px;
+  font-size: 11px; line-height: 1;
+  text-decoration: none; opacity: .65;
 }
-#comments-list { margin-bottom: 14px; }
-.comment {
-  padding: 9px 12px; background: #f8f8f8; border-radius: 8px; margin-bottom: 8px;
-}
-.comment-author { font-size: 12px; font-weight: 700; color: #555; }
-.comment-time   { font-size: 11px; color: #ccc; margin-left: 5px; }
-.comment-text   { font-size: 13px; color: #333; margin-top: 3px; line-height: 1.5; }
+.photo-dot:hover { opacity: 1; }
 
-#comment-form { display: none; flex-direction: column; gap: 8px; }
-#comment-input {
-  width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 8px;
-  font-size: 13px; resize: none; font-family: inherit; color: #333; min-height: 65px;
+/* ── Ansökningsmodal ── */
+#apply-modal {
+  position: fixed; inset: 0; background: rgba(0,0,0,.5);
+  z-index: 100; display: none; align-items: center; justify-content: center;
 }
-#comment-submit {
-  align-self: flex-end; padding: 7px 18px; background: #333; color: white;
-  border: none; border-radius: 8px; cursor: pointer; font-size: 13px;
+#apply-box {
+  background: white; border-radius: 18px; padding: 28px 28px 22px;
+  max-width: 420px; width: 92%; box-shadow: 0 8px 40px rgba(0,0,0,.22);
 }
-#comment-submit:hover { background: #111; }
-#login-prompt { font-size: 13px; color: #bbb; text-align: center; padding: 6px; }
+#apply-box h2 { font-size: 16px; margin-bottom: 8px; color: #222; }
+#apply-box p  { font-size: 12.5px; color: #666; margin-bottom: 18px; line-height: 1.55; }
+.apply-field { margin-bottom: 13px; }
+.apply-field label { display:block; font-size:10px; font-weight:700; color:#aaa; margin-bottom:4px; text-transform:uppercase; letter-spacing:.5px; }
+.apply-field input, .apply-field textarea {
+  width: 100%; border: 1.5px solid #ddd; border-radius: 10px;
+  padding: 8px 11px; font-size: 13px; font-family: inherit; outline: none;
+  transition: border-color .15s; box-sizing: border-box;
+}
+.apply-field input:focus, .apply-field textarea:focus { border-color: #5ab6e0; }
+.apply-field textarea { resize: vertical; min-height: 72px; }
+#apply-submit {
+  width: 100%; padding: 10px; border-radius: 12px; border: none;
+  background: #5ab6e0; color: white; font-size: 14px; font-weight: 700;
+  cursor: pointer; transition: background .1s; margin-top: 4px;
+}
+#apply-submit:hover { background: #3a96c0; }
+#apply-submit:disabled { background: #bbb; cursor: default; }
+#apply-cancel, #apply-cancel2, #apply-cancel3 {
+  font-size: 12px; color: #bbb; background:none; border:none; cursor:pointer;
+  margin-top: 10px; display: block; width: 100%; text-align: center;
+}
+#apply-cancel:hover, #apply-cancel2:hover, #apply-cancel3:hover { color: #888; }
+#apply-status { font-size: 12.5px; margin-top: 8px; text-align: center; min-height: 18px; }
+#gsi-btn-container { display: flex; justify-content: center; margin-top: 12px; }
+.apply-success-icon { font-size: 36px; text-align:center; margin: 10px 0; }
 
-/* ── German Gen 6 extension ── */
-.ext-section {
-  margin: 28px 40px 60px; padding: 26px 30px;
-  background: #fdf8e8; border: 1.5px solid #e8d880; border-radius: 12px;
+/* ── Fotolänk i detaljpanelen ── */
+.photos-link {
+  display: inline-block; margin-top: 6px;
+  padding: 6px 12px; border-radius: 8px;
+  background: #2a2a2a; color: #ccc;
+  font-size: 13px; text-decoration: none; cursor: pointer; border: none;
+  transition: background .15s, color .15s;
 }
-.ext-section h2 { font-size: 15px; font-weight: 700; color: #7a6010; margin-bottom: 5px; }
-.ext-section p  { font-size: 12px; color: #9a7a20; margin-bottom: 18px; }
-.ext-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-.ext-col h3 { font-size: 11.5px; font-weight: 700; color: #aaa; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 10px; }
-.ext-row  { display: flex; align-items: center; margin-bottom: 10px; }
-.ext-card {
-  display: flex; align-items: center; gap: 7px;
-  padding: 5px 11px 5px 5px; border-radius: 50px; border: 2px solid; width: 185px; flex-shrink: 0;
-  background: white;
+.photos-link:hover { background: #3a3a3a; color: #fff; }
+
+/* ── Admin-panel ── */
+#admin-modal {
+  position: fixed; inset: 0; background: rgba(0,0,0,.5);
+  z-index: 100; display: none; align-items: flex-start;
+  justify-content: center; padding-top: 60px;
 }
-.ext-card .av { width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; color: white; }
-.ext-card .nm { font-size: 11.5px; font-weight: 700; color: #222; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ext-card .dt { font-size: 10px; color: #888; }
-.ext-line { width: 16px; height: 2px; background: #bb9020; flex-shrink: 0; }
-.ext-parents { display: flex; flex-direction: column; gap: 5px; }
+#admin-box {
+  background: white; border-radius: 18px;
+  width: 92%; max-width: 700px; max-height: 78vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 8px 40px rgba(0,0,0,.22);
+}
+#admin-head {
+  padding: 16px 20px; display: flex; align-items: center;
+  border-bottom: 1px solid #eee; flex-shrink: 0; gap: 10px;
+}
+#admin-head h2 { font-size: 14px; font-weight: 700; flex: 1; color: #222; }
+#admin-head-close { background: none; border: none; font-size: 17px; color: #bbb; cursor: pointer; line-height: 1; }
+#admin-head-close:hover { color: #666; }
+#admin-body { flex: 1; overflow-y: auto; }
+.admin-row {
+  display: grid; grid-template-columns: 1.4fr 1.6fr auto;
+  padding: 10px 18px; border-bottom: 1px solid #f2f2f2;
+  gap: 12px; align-items: center;
+}
+.admin-row:last-child { border-bottom: none; }
+.admin-name  { font-size: 12.5px; font-weight: 700; color: #222; }
+.admin-email { font-size: 10.5px; color: #aaa; margin-top: 1px; }
+.admin-relation { font-size: 11.5px; color: #666; line-height: 1.4; }
+.admin-right { display: flex; align-items: center; gap: 6px; justify-content: flex-end; }
+.badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 8px; white-space: nowrap; }
+.badge-ok  { background: #e0f5e8; color: #1a7a3a; }
+.badge-wait{ background: #fff3cc; color: #8a6000; }
+.badge-no  { background: #fde8e8; color: #a02020; }
+.adm-ok { padding: 4px 11px; border-radius: 8px; border: none; background: #2a9a50; color: white; font-size: 11px; cursor: pointer; }
+.adm-no { padding: 4px 11px; border-radius: 8px; border: none; background: #e06060; color: white; font-size: 11px; cursor: pointer; }
+.adm-ok:hover { background: #1a7a3a; }
+.adm-no:hover { background: #c04040; }
+.admin-empty { padding: 40px; text-align: center; color: #bbb; font-size: 13px; font-style: italic; }
+#admin-btn {
+  padding: 5px 10px; border-radius: 20px; border: 1.5px solid #ddd;
+  background: white; font-size: 13px; cursor: pointer; color: #777;
+  transition: background .1s; display: none;
+}
+#admin-btn:hover { background: #f5f5f5; }
+
+/* ── Toast ── */
+#toast {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+  background: rgba(40,40,40,.93); color: #fff;
+  padding: 9px 18px; border-radius: 20px; font-size: 12.5px;
+  pointer-events: none; z-index: 200; opacity: 0;
+  transition: opacity .2s; white-space: nowrap;
+}
+#toast.show { opacity: 1; }
+
+/* ── Stamtavla-titel klickbar ── */
+#topbar h1 { cursor: pointer; }
+#topbar h1:hover { color: #5ab6e0; }
+
+/* ── Fotovisare-modal ── */
+#photo-modal {
+  position: fixed; inset: 0; background: rgba(0,0,0,.55);
+  z-index: 110; display: none; align-items: center; justify-content: center;
+}
+#photo-box {
+  background: white; border-radius: 18px;
+  max-width: 420px; width: 92%; max-height: 75vh;
+  display: flex; flex-direction: column;
+  box-shadow: 0 8px 40px rgba(0,0,0,.28); overflow: hidden;
+}
+#photo-head {
+  padding: 13px 18px; display: flex; align-items: center; gap: 10px;
+  border-bottom: 1px solid #eee; flex-shrink: 0;
+}
+#photo-head h3 { flex: 1; font-size: 13.5px; font-weight: 700; color: #222; }
+#photo-close { background: none; border: none; font-size: 17px; color: #bbb; cursor: pointer; line-height: 1; }
+#photo-close:hover { color: #555; }
+#photo-list { overflow-y: auto; }
+.photo-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 18px; text-decoration: none; color: #333;
+  border-bottom: 1px solid #f2f2f2; transition: background .1s;
+}
+.photo-item:last-child { border-bottom: none; }
+.photo-item:hover { background: #f7f7f7; }
+.photo-icon { font-size: 20px; flex-shrink: 0; }
+.photo-label { font-size: 13px; flex: 1; line-height: 1.4; }
+.photo-arrow { color: #ccc; font-size: 13px; }
+
+/* ── Mobile backdrop (detail panel) ── */
+#det-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.35);
+  z-index: 29;
+  display: none;
+}
+#det-backdrop.visible { display: block; }
+
+/* ════ MOBILANPASSNING ════ */
+@media (max-width: 640px) {
+
+  /* ─ Topbar ─ */
+  #topbar {
+    flex-wrap: wrap;
+    padding: 8px 12px 6px;
+    gap: 6px 10px;
+  }
+  #topbar h1 { font-size: 15px; }
+  #focus-name { order: 10; width: 100%; flex: none; font-size: 12px; padding-bottom: 2px; }
+  .hint { display: none; }
+  #lang-toggle { margin-left: 0; }
+  .lang-btn { font-size: 15px; }
+  #back { font-size: 12px; padding: 5px 10px; }
+  #auth-open-btn { font-size: 11px; padding: 4px 9px; }
+  #admin-btn { font-size: 11px; padding: 4px 8px; }
+  #auth-zone { gap: 6px; }
+  #user-name { max-width: 80px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* ─ Detail panel — bottom sheet ─ */
+  #detail {
+    position: fixed;
+    inset: auto 0 0 0;
+    width: 100%;
+    max-height: 65vh;
+    border-left: none;
+    border-top: 1px solid #ddd;
+    border-radius: 16px 16px 0 0;
+    box-shadow: 0 -4px 24px rgba(0,0,0,.15);
+    z-index: 30;
+    transition: transform .3s ease;
+    transform: translateY(0);
+  }
+  #detail.collapsed {
+    width: 100%;
+    transform: translateY(110%);
+  }
+  /* Handtag-rad överst i bottom sheet */
+  #detail::before {
+    content: '';
+    display: block;
+    width: 40px; height: 4px;
+    background: #ddd; border-radius: 2px;
+    margin: 8px auto 0;
+    flex-shrink: 0;
+    align-self: center;
+  }
+  #det-close { font-size: 22px; padding: 4px 8px; }
+
+  /* ─ Zoom-knappar — större tryckyta ─ */
+  .zoom-btn { width: 46px; height: 46px; font-size: 26px; }
+  #zoom-controls { bottom: 14px; }
+
+  /* ─ Admin-panel — bottom sheet ─ */
+  #admin-modal {
+    padding-top: 10px;
+    align-items: flex-end;
+    padding-bottom: 0;
+  }
+  #admin-box {
+    border-radius: 18px 18px 0 0;
+    max-height: 85vh;
+    width: 100%;
+    max-width: 100%;
+  }
+  .admin-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+    padding: 12px 14px;
+  }
+  .admin-right { justify-content: flex-start; margin-top: 4px; }
+
+  /* ─ Ansökningsmodal ─ */
+  #apply-box { padding: 20px 16px 16px; }
+  #apply-box h2 { font-size: 15px; }
+}
 </style>
 </head>
-<body>
+<body class="lang-sv">
 
-<header>
-  <div>
-    <h1 id="h-title">Stamtavla – Lasse Nilsson</h1>
-  </div>
-  <p class="subtitle" id="h-sub">5 generationer · Genererad 2026-02-27</p>
-  <div class="controls">
-    <button class="flag-btn" id="flag-sv" title="Svenska" onclick="setLang('sv')">🇸🇪</button>
-    <button class="flag-btn" id="flag-en" title="English" onclick="setLang('en')">🇺🇸</button>
-    <div id="auth-area"></div>
-  </div>
-</header>
+<div id="toast"></div>
+<div id="det-backdrop"></div>
 
-<div class="legend">
-  <div class="leg"><div class="leg-dot" style="border-color:#5ab6e0;background:#eaf5fc"></div><span id="leg0"></span></div>
-  <div class="leg"><div class="leg-dot" style="border-color:#52bb52;background:#eafaea"></div><span id="leg1"></span></div>
-  <div class="leg"><div class="leg-dot" style="border-color:#e06060;background:#fbeaea"></div><span id="leg2"></span></div>
-  <div class="leg"><div class="leg-dot" style="border-color:#d0b040;background:#fdf8e0"></div><span id="leg3"></span></div>
-  <div class="leg"><div class="leg-dot" style="border-color:#9060d0;background:#f4eefb"></div><span id="leg4"></span></div>
-  <div class="leg"><div class="leg-dot" style="border-color:#bbb;background:#f7f7f7"></div><span id="leg5"></span></div>
-</div>
-
-<div class="chart-viewport" id="vp">
-  <div class="chart-pan" id="pan">
-  <div class="chart" id="chart">
-  <svg id="lines"></svg>
-
-  <span class="gen-label" style="left:20px"  id="gl0"></span>
-  <span class="gen-label" style="left:260px" id="gl1"></span>
-  <span class="gen-label" style="left:500px" id="gl2"></span>
-  <span class="gen-label" style="left:740px" id="gl3"></span>
-  <span class="gen-label" style="left:980px" id="gl4"></span>
-
-  <!-- GEN 0 -->
-  <div class="card mix" id="sanna"    data-p="sanna"    style="left:20px;  top:490px">  <div class="av">👤</div><div class="info"><div class="nm">Sanna Nilsson</div><div class="dt" id="dt-sanna"></div></div></div>
-  <div class="card mix" id="lasse"    data-p="lasse"    style="left:20px;  top:600px">  <div class="av">🧑</div><div class="info"><div class="nm">Lasse Nilsson</div><div class="dt" id="dt-lasse"></div></div></div>
-  <div class="card mix" id="matti"    data-p="matti"    style="left:20px;  top:710px">  <div class="av">👤</div><div class="info"><div class="nm">Matti Nilsson</div><div class="dt" id="dt-matti"></div></div></div>
-
-  <!-- GEN 2 -->
-  <div class="card sv"  id="leif"     data-p="leif"     style="left:260px; top:300px">  <div class="av">👤</div><div class="info"><div class="nm">Leif Nilsson</div><div class="dt" id="dt-leif"></div></div></div>
-  <div class="card rs"  id="marijana" data-p="marijana" style="left:260px; top:900px">  <div class="av">👤</div><div class="info"><div class="nm">Marijana Mitrovic</div><div class="dt" id="dt-marijana"></div></div></div>
-
-  <!-- GEN 3 -->
-  <div class="card sv"  id="tage"     data-p="tage"     style="left:500px; top:150px">  <div class="av">👤</div><div class="info"><div class="nm">Carl Tage Nilsson</div><div class="dt" id="dt-tage"></div></div></div>
-  <div class="card svb" id="lilian"   data-p="lilian"   style="left:500px; top:450px">  <div class="av">👤</div><div class="info"><div class="nm">Lilian Bergman</div><div class="dt" id="dt-lilian"></div></div></div>
-  <div class="card rs"  id="ceda"     data-p="ceda"     style="left:500px; top:750px">  <div class="av">👤</div><div class="info"><div class="nm">Cedomir Mitrovic</div><div class="dt" id="dt-ceda"></div></div></div>
-  <div class="card de"  id="kathe"    data-p="kathe"    style="left:500px; top:1050px"> <div class="av">👤</div><div class="info"><div class="nm">Käthe Lammerding</div><div class="dt" id="dt-kathe"></div></div></div>
-
-  <!-- GEN 4 -->
-  <div class="card sv"  id="kalle"    data-p="kalle"    style="left:740px; top:75px">   <div class="av">👤</div><div class="info"><div class="nm">Carl August Nilsson</div><div class="dt" id="dt-kalle"></div></div></div>
-  <div class="card sv"  id="alma"     data-p="alma"     style="left:740px; top:225px">  <div class="av">👤</div><div class="info"><div class="nm">Alma Maria Linder</div><div class="dt" id="dt-alma"></div></div></div>
-  <div class="card svb" id="alfred"   data-p="alfred"   style="left:740px; top:375px">  <div class="av">👤</div><div class="info"><div class="nm">Alfred Bergman</div><div class="dt" id="dt-alfred"></div></div></div>
-  <div class="card svb" id="amanda"   data-p="amanda"   style="left:740px; top:525px">  <div class="av">👤</div><div class="info"><div class="nm">Amanda Strömberg</div><div class="dt" id="dt-amanda"></div></div></div>
-  <div class="card unk" id="petar"    data-p="petar"    style="left:740px; top:675px">  <div class="av">?</div><div class="info"><div class="nm">Petar Mitrovic</div><div class="dt" id="dt-petar"></div></div></div>
-  <div class="card rs"  id="stanija"  data-p="stanija"  style="left:740px; top:825px">  <div class="av">👤</div><div class="info"><div class="nm">Stanija Blagojevic</div><div class="dt" id="dt-stanija"></div></div></div>
-  <div class="card de"  id="willibald" data-p="willibald" style="left:740px; top:975px"> <div class="av">👤</div><div class="info"><div class="nm">Willibald Lammerding</div><div class="dt" id="dt-willibald"></div></div></div>
-  <div class="card de"  id="trudis"   data-p="trudis"   style="left:740px; top:1125px"> <div class="av">👤</div><div class="info"><div class="nm">Gertrud Schräder</div><div class="dt" id="dt-trudis"></div></div></div>
-
-  <!-- GEN 5 -->
-  <div class="card rs"  id="jovanovic" data-p="jovanovic" style="left:980px; top:787px">  <div class="av">?</div><div class="info"><div class="nm">Jovanovic (far)</div><div class="dt" id="dt-jovanovic"></div></div></div>
-  <div class="card de"  id="hermann"  data-p="hermann"  style="left:980px; top:937px">  <div class="av">👤</div><div class="info"><div class="nm">Hermann Lammerding</div><div class="dt" id="dt-hermann"></div></div></div>
-  <div class="card de"  id="paula"    data-p="paula"    style="left:980px; top:1012px"> <div class="av">👤</div><div class="info"><div class="nm">Paula Vorspohl</div><div class="dt" id="dt-paula"></div></div></div>
-  <div class="card de"  id="josefb"   data-p="josefb"   style="left:980px; top:1087px"> <div class="av">👤</div><div class="info"><div class="nm">Josef B. Schräder</div><div class="dt" id="dt-josefb"></div></div></div>
-  <div class="card de"  id="mkcordes" data-p="mkcordes" style="left:980px; top:1162px"> <div class="av">👤</div><div class="info"><div class="nm">Maria Kath. Cordes</div><div class="dt" id="dt-mkcordes"></div></div></div>
-
-  </div><!-- .chart -->
-  </div><!-- .chart-pan -->
-
-  <div class="zoom-controls">
-    <button id="zin">+</button>
-    <button id="zout">−</button>
-    <button id="zreset">↺</button>
-  </div>
-  <div class="zoom-hint" id="zoom-hint"></div>
-</div>
-
-<!-- German Gen 6 -->
-<div class="ext-section">
-  <h2 id="ext-title"></h2>
-  <p  id="ext-sub"></p>
-  <div class="ext-grid">
-    <div class="ext-col">
-      <h3 id="ext-wil"></h3>
-      <div class="ext-row">
-        <div class="ext-card de"><div class="av" style="background:#d0b040">👤</div><div class="info"><div class="nm">Hermann Lammerding</div><div class="dt">*1858 Schöppingen</div></div></div>
-        <div class="ext-line"></div>
-        <div class="ext-parents">
-          <div class="ext-card de"><div class="av" style="background:#d0b040">👤</div><div class="info"><div class="nm">Bernhard Lammerding</div><div class="dt">* okänt</div></div></div>
-          <div class="ext-card de"><div class="av" style="background:#d0b040">👤</div><div class="info"><div class="nm">Elisabeth Wewermann</div><div class="dt">* okänt</div></div></div>
-        </div>
-      </div>
-      <div class="ext-row">
-        <div class="ext-card de"><div class="av" style="background:#d0b040">👤</div><div class="info"><div class="nm">Paula Vorspohl</div><div class="dt">*1862</div></div></div>
-        <div class="ext-line"></div>
-        <div class="ext-parents">
-          <div class="ext-card de"><div class="av" style="background:#d0b040">👤</div><div class="info"><div class="nm">Heinrich Vorpohl</div><div class="dt">*4 dec 1829</div></div></div>
-          <div class="ext-card de"><div class="av" style="background:#d0b040">👤</div><div class="info"><div class="nm">Anna Spenneberg</div><div class="dt">*6 apr 1831</div></div></div>
-        </div>
-      </div>
+<!-- ── Admin-panel ── -->
+<div id="admin-modal">
+  <div id="admin-box">
+    <div id="admin-head">
+      <h2>📋 Bildarkiv — ansökningar</h2>
+      <button id="admin-head-close" onclick="closeAdminPanel()">✕</button>
     </div>
-    <div class="ext-col">
-      <h3 id="ext-gert"></h3>
-      <div class="ext-row">
-        <div class="ext-card de"><div class="av" style="background:#d0b040">👤</div><div class="info"><div class="nm">Josef B. Schräder</div><div class="dt">*1859 Borghorst</div></div></div>
-        <div class="ext-line"></div>
-        <div class="ext-parents">
-          <div class="ext-card de"><div class="av" style="background:#d0b040">👤</div><div class="info"><div class="nm">Heinrich Schräder</div><div class="dt">* okänt</div></div></div>
-          <div class="ext-card de"><div class="av" style="background:#d0b040">👤</div><div class="info"><div class="nm">Antonette Laumann</div><div class="dt">* okänt</div></div></div>
-        </div>
-      </div>
-      <div class="ext-row">
-        <div class="ext-card de"><div class="av" style="background:#d0b040">👤</div><div class="info"><div class="nm">Maria Kath. Cordes</div><div class="dt">*1857 Alverskirchen</div></div></div>
-        <div class="ext-line"></div>
-        <div class="ext-parents">
-          <div class="ext-card de"><div class="av" style="background:#d0b040">👤</div><div class="info"><div class="nm">Theodor Cordes</div><div class="dt">* okänt</div></div></div>
-          <div class="ext-card de"><div class="av" style="background:#d0b040">👤</div><div class="info"><div class="nm">Maria Kath. Teves</div><div class="dt">* okänt</div></div></div>
-        </div>
-      </div>
+    <div id="admin-body">
+      <div class="admin-empty">Laddar…</div>
     </div>
   </div>
 </div>
 
-<!-- Detail panel – right side, NO backdrop so page never dims -->
-<div id="panel">
-  <div id="panel-head">
-    <div id="panel-av"></div>
-    <div id="panel-head-text">
-      <div id="panel-name"></div>
-      <div id="panel-dates"></div>
-    </div>
-    <button id="panel-close">×</button>
+<div id="topbar">
+  <h1 onclick="goHome()" title="Gå till startvyn (Lasse)">Stamtavla</h1>
+  <span id="focus-name"></span>
+  <button id="back" disabled>← Tillbaka</button>
+  <span class="hint">Klicka ett syskon för att centrera trädet på den personen</span>
+  <div id="lang-toggle">
+    <button class="lang-btn active" data-lang="sv">🇸🇪</button>
+    <button class="lang-btn"        data-lang="de">🇩🇪</button>
   </div>
-  <div id="panel-body">
-    <div id="panel-bio"></div>
-    <div id="panel-sibs" style="display:none">
-      <strong id="sibs-label"></strong>
-      <span  id="sibs-text"></span>
+  <div id="auth-zone">
+    <button id="admin-btn" onclick="openAdminPanel()" title="Bildarkiv — ansökningar">📋 Admin</button>
+    <button id="auth-open-btn" onclick="openApplyModal()">📷 Bildarkiv</button>
+    <div id="user-chip">
+      <img id="user-pic" src="" alt="">
+      <span id="user-name"></span>
+      <button id="sign-out-btn" onclick="signOut()" title="Logga ut">✕</button>
     </div>
-    <button id="edit-btn">✏️ <span id="edit-label"></span></button>
-    <div id="edit-form">
-      <label id="edit-sv-label">Text (svenska)</label>
-      <textarea id="edit-sv"></textarea>
-      <label id="edit-en-label">Text (English)</label>
-      <textarea id="edit-en"></textarea>
-      <div class="edit-actions">
-        <button id="edit-save"></button>
-        <button id="edit-cancel"></button>
+  </div>
+</div>
+
+<div id="main">
+  <div id="viewport">
+    <div id="zoom-layer">
+      <div id="wrap">
+        <canvas id="cv"></canvas>
       </div>
     </div>
-    <div class="sec-title" id="comments-title"></div>
-    <div id="comments-list"></div>
-    <div id="comment-form">
-      <textarea id="comment-input"></textarea>
-      <button id="comment-submit"></button>
-    </div>
-    <div id="login-prompt"></div>
   </div>
+  <div id="detail">
+    <div class="det-empty">Välj en person i trädet</div>
+  </div>
+</div>
+
+<!-- ── Ansökningsmodal ── -->
+<div id="apply-modal">
+  <div id="apply-box">
+
+    <!-- Vy 1: Logga in med Google (visas alltid först) -->
+    <div id="apply-view-signin">
+      <h2>📷 Bildarkivet</h2>
+      <p>Logga in med ditt Google-konto för att se familjebilderna.<br>
+         <small style="color:#bbb">Har du inte tillgång ännu? Vi skickar en förfrågan till Lasse automatiskt efter inloggningen.</small></p>
+      <div id="gsi-btn-container"></div>
+      <button id="apply-cancel2" onclick="closeApplyModal()">Avbryt</button>
+    </div>
+
+    <!-- Vy 2: Ansök om tillgång (visas om inte godkänd ännu) -->
+    <div id="apply-view-request" style="display:none">
+      <h2>📷 Ansök om tillgång</h2>
+      <p id="apply-intro-text">Ditt Google-konto är inte godkänt ännu. Fyll i ditt namn och hur du är släkt med Lasse — han godkänner via sin mobil.</p>
+      <div class="apply-field">
+        <label>Ditt namn</label>
+        <input id="apply-name" type="text" placeholder="Förnamn Efternamn" autocomplete="name">
+      </div>
+      <input id="apply-email" type="hidden">
+      <div class="apply-field">
+        <label>Hur ingår du i släkten?</label>
+        <textarea id="apply-relation" placeholder="T.ex. jag är dotter till Lillemor Nilsson, alltså ditt syskonbarn…"></textarea>
+      </div>
+      <button id="apply-submit" onclick="submitApplication()">Skicka ansökan</button>
+      <div id="apply-status"></div>
+      <button id="apply-cancel" onclick="closeApplyModal()">Avbryt</button>
+    </div>
+
+    <!-- Vy 3: Ansökan skickad -->
+    <div id="apply-view-pending" style="display:none">
+      <div class="apply-success-icon">🎉</div>
+      <h2 style="text-align:center">Ansökan skickad!</h2>
+      <p style="text-align:center">Lasse får ett mail med din ansökan och godkänner via sin mobil.
+         Du får ett välkomstmail till din Gmail-adress när du är godkänd.<br><br>
+         <small id="apply-pending-note" style="color:#bbb"></small></p>
+      <button id="apply-cancel3" onclick="closeApplyModal()">Stäng</button>
+    </div>
+
+  </div>
+</div>
+
+
+
+<!-- ── Fotovisare-modal ── -->
+<div id="photo-modal">
+  <div id="photo-box">
+    <div id="photo-head">
+      <h3 id="photo-person-name"></h3>
+      <button id="photo-close" onclick="closePhotoModal()">✕</button>
+    </div>
+    <div id="photo-list"></div>
+  </div>
+</div>
+
+<div id="zoom-controls">
+  <button class="zoom-btn" id="zoom-in">+</button>
+  <button class="zoom-btn" id="zoom-out">−</button>
 </div>
 
 <script>
-// ══════════════════════════════════════════════════════════
-// CONFIGURATION
-// Fill in firebase and adminEmail to enable comments/editing.
-// Leave firebase: null for read-only (zoom/pan/panel still work).
-// ══════════════════════════════════════════════════════════
-const CONFIG = {
-  firebase: null,
-  /* Example:
-  firebase: {
-    apiKey: "AIza...",
-    authDomain: "your-project.firebaseapp.com",
-    projectId: "your-project",
-    storageBucket: "your-project.appspot.com",
-    messagingSenderId: "12345",
-    appId: "1:12345:web:abc"
-  },
-  */
-  adminEmail: 'lasse@example.com',  // ← your Google account email
-};
-
-// ── i18n ──────────────────────────────────────────────────
-const T = {
+// ════ TRANSLATIONS ════
+const LANG = {
   sv: {
-    title:    'Stamtavla – Lasse Nilsson',
-    sub:      '5 generationer · Genererad 2026-02-27',
-    login:    'Logga in med Google',
-    logout:   'Logga ut',
-    siblings: 'Syskon',
-    edit:     'Redigera',
-    save:     'Spara',
-    cancel:   'Avbryt',
-    comments: 'Kommentarer',
-    addCmt:   'Lägg till kommentar…',
-    submit:   'Skicka',
-    noCmt:    'Inga kommentarer ännu.',
-    loginCmt: 'Logga in för att kommentera.',
-    zoomHint: 'Scroll = zoom · Dra = flytta',
-    legs:     ['Svensk – Nilsson','Svensk – Bergman','Serbisk – Mitrovic','Tysk – Lammerding/Schräder',"Lasses generation",'Okänd / osäker'],
-    gens:     ['Lasses gen.','Föräldrar','Mor-/farföräldrar','Gammelföräldrar','Ggammelföräldrar'],
-    ext:      ['Tyska sidan – Generation 6 (ca 1820–1870)',
-               'Gammelgammelgammelföräldrar – verifierat via Matricula Online (katolska dopböcker Borghorst/Schöppingen)',
-               'Willibald Lammerdings föräldrar och deras föräldrar',
-               'Gertrud Schräders föräldrar och deras föräldrar'],
+    title:    'Stamtavla',
+    back:     '← Tillbaka',
+    hint:     'Klicka ett syskon för att centrera trädet på den personen',
+    genLabels:['Du / Fokus','Föräldrar','Mor-/farföräldrar','Gammelföräldrar','Ggammelföräldrar','Gggammelföräldrar'],
+    detParents:  'Föräldrar',
+    detSpouse:   'Make / Maka',
+    detChildren: 'Barn',
+    detSiblings: 'Syskon',
+    detNote:     'Anteckning',
+    detEmpty:    'Välj en person i trädet',
+    bildarkiv:      'Bildarkiv',
+    modalTitle:     '📷 Bildarkivet',
+    modalIntro:     'Stamtavlan är öppen för alla — men familjebilderna är reserverade för släktmedlemmar. Fyll i formuläret nedan så hör Lasse av sig inom några dagar.',
+    labelName:      'Ditt namn',
+    phName:         'Förnamn Efternamn',
+    labelEmail:     'Din Gmail-adress (används för inloggning)',
+    labelRelation:  'Hur ingår du i släkten?',
+    phRelation:     'T.ex. jag är dotter till Lillemor Nilsson, alltså ditt syskonbarn…',
+    btnApply:       'Skicka ansökan',
+    btnCancel:      'Avbryt',
+    btnClose:       'Stäng',
+    signinTitle:    '📷 Bildarkivet',
+    signinText:     'Logga in med ditt Google-konto för att se familjebilderna.',
+    pendingTitle:   'Ansökan skickad!',
+    pendingText:    'Lasse får ett mail med din ansökan och godkänner via sin mobil. Nästa gång du loggar in med samma Google-konto får du direkt tillgång.',
   },
-  en: {
-    title:    'Family Tree – Lasse Nilsson',
-    sub:      '5 generations · Generated 2026-02-27',
-    login:    'Sign in with Google',
-    logout:   'Sign out',
-    siblings: 'Siblings',
-    edit:     'Edit',
-    save:     'Save',
-    cancel:   'Cancel',
-    comments: 'Comments',
-    addCmt:   'Add a comment…',
-    submit:   'Submit',
-    noCmt:    'No comments yet.',
-    loginCmt: 'Sign in to comment.',
-    zoomHint: 'Scroll = zoom · Drag = pan',
-    legs:     ['Swedish – Nilsson','Swedish – Bergman','Serbian – Mitrovic','German – Lammerding/Schräder',"Lasse's generation",'Unknown / uncertain'],
-    gens:     ["Lasse's gen.",'Parents','Grandparents','Great-grandparents','GG-grandparents'],
-    ext:      ['German side – Generation 6 (ca 1820–1870)',
-               'Great-great-great-grandparents – verified via Matricula Online (Catholic baptism records Borghorst/Schöppingen)',
-               'Parents of Willibald Lammerding and their parents',
-               'Parents of Gertrud Schräder and their parents'],
-  },
+  de: {
+    title:    'Stammbaum',
+    back:     '← Zurück',
+    hint:     'Klicke auf ein Geschwister, um den Baum auf diese Person zu zentrieren',
+    genLabels:['Du / Fokus','Eltern','Großeltern','Urgroßeltern','Ururgroßeltern','Urururgroßeltern'],
+    detParents:  'Eltern',
+    detSpouse:   'Ehepartner',
+    detChildren: 'Kinder',
+    detSiblings: 'Geschwister',
+    detNote:     'Notiz',
+    detEmpty:    'Wähle eine Person im Baum aus',
+    bildarkiv:      'Fotoarchiv',
+    modalTitle:     '📷 Fotoarchiv',
+    modalIntro:     'Der Stammbaum ist für alle zugänglich — aber die Familienfotos sind Familienmitgliedern vorbehalten. Füllen Sie das Formular aus, und Lasse meldet sich innerhalb weniger Tage.',
+    labelName:      'Ihr Name',
+    phName:         'Vorname Nachname',
+    labelEmail:     'Ihre Gmail-Adresse (für die Anmeldung)',
+    labelRelation:  'Wie gehören Sie zur Familie?',
+    phRelation:     'Z.B. ich bin die Tochter von Lillemor Nilsson, also Ihre Nichte…',
+    btnApply:       'Anfrage senden',
+    btnCancel:      'Abbrechen',
+    btnClose:       'Schließen',
+    signinTitle:    '📷 Fotoarchiv',
+    signinText:     'Melden Sie sich mit Ihrem Google-Konto an, um die Familienfotos zu sehen.',
+    pendingTitle:   'Anfrage gesendet!',
+    pendingText:    'Lasse erhält eine E-Mail mit Ihrer Anfrage und genehmigt sie über sein Mobiltelefon. Beim nächsten Login erhalten Sie direkt Zugang.',
+  }
 };
-
-// ── Person data ────────────────────────────────────────────
-const P = {
-  lasse:     { sv:{ dates:'Född 12 sep 1975',    bio:'Lasse Nilsson är stamtavlans centrala person – med rötter i Sverige, Serbien och Tyskland.', sibs:'Sanna (*24 dec 1977) · Matti (*26 apr 1983)' }, en:{ dates:'Born 12 Sep 1975',    bio:"Lasse Nilsson is the central person of this family tree – with roots in Sweden, Serbia, and Germany.", sibs:'Sanna (*24 Dec 1977) · Matti (*26 Apr 1983)' } },
-  sanna:     { sv:{ dates:'Född 24 dec 1977',    bio:'', sibs:'Lasse (*12 sep 1975) · Matti (*26 apr 1983)' }, en:{ dates:'Born 24 Dec 1977',    bio:'', sibs:'Lasse (*12 Sep 1975) · Matti (*26 Apr 1983)' } },
-  matti:     { sv:{ dates:'Född 26 apr 1983',    bio:'', sibs:'Sanna (*24 dec 1977) · Lasse (*12 sep 1975)' }, en:{ dates:'Born 26 Apr 1983',    bio:'', sibs:'Sanna (*24 Dec 1977) · Lasse (*12 Sep 1975)' } },
-  leif:      { sv:{ dates:'Född 7 jul 1942',     bio:'Leif Nilsson, Lasses far. Uppvuxen i Mjölby.', sibs:'Lillemor 1944 · Per-Olof 1946–1992 · Elisabeth 1949–2026' }, en:{ dates:'Born 7 Jul 1942',     bio:"Leif Nilsson, Lasse's father. Grew up in Mjölby.", sibs:'Lillemor 1944 · Per-Olof 1946–1992 · Elisabeth 1949–2026' } },
-  marijana:  { sv:{ dates:'Född 7 apr 1946',     bio:'Marijana Mitrovic, Lasses mor. Född i Münster av serbiska displaced persons-föräldrar efter WWII.', sibs:'Vera *1950 Münster · Jela *1953 Münster' }, en:{ dates:'Born 7 Apr 1946',     bio:"Marijana Mitrovic, Lasse's mother. Born in Münster to Serbian displaced persons after WWII.", sibs:'Vera *1950 Münster · Jela *1953 Münster' } },
-  tage:      { sv:{ dates:'1919 – 1990',          bio:'Carl Tage Nilsson, Leifs far. Uppvuxen i Mjölby.', sibs:'Anne-Marie 1917 · Yngve 1924–1973' }, en:{ dates:'1919 – 1990',          bio:"Carl Tage Nilsson, Leif's father. From Mjölby.", sibs:'Anne-Marie 1917 · Yngve 1924–1973' } },
-  lilian:    { sv:{ dates:'1920 – 2000',          bio:'Lilian Bergman, Leifs mor.', sibs:'Hulda 1908 · Tor Elof 1910 · Gurli Erika 1910 · Karin 1923' }, en:{ dates:'1920 – 2000',          bio:"Lilian Bergman, Leif's mother.", sibs:'Hulda 1908 · Tor Elof 1910 · Gurli Erika 1910 · Karin 1923' } },
-  ceda:      { sv:{ dates:'1912 – 1981',          bio:'Cedomir "Ceda" Mitrovic, Marijanas far. Serb, fångades av nazisterna och överlevde KZ-läger (Fallingbostel/Sachsenhausen). Kom som DP till Münster 1945 och dog där 1981.', sibs:'Milorad "Mile" ca 1900 · Dimitri (försvunnen)' }, en:{ dates:'1912 – 1981',          bio:'Cedomir "Ceda" Mitrovic, father of Marijana. Serbian farmer captured by the Nazis; survived concentration camps (Fallingbostel/Sachsenhausen). Came to Münster as a DP in 1945, died there in 1981.', sibs:'Milorad "Mile" ca 1900 · Dimitri (disappeared)' } },
-  kathe:     { sv:{ dates:'1926 – 2009',          bio:'Katharina Mathilde Josefine Lammerding, gift Mitrovic. Tysk kvinna från Borghorst, Münster-regionen.', sibs:'Egid 1925–1944 · Franz 1930–2024 · Gertrud 1935–2019 · Maria 1939–2018' }, en:{ dates:'1926 – 2009',          bio:'Katharina Mathilde Josefine Lammerding, married Mitrovic. German woman from Borghorst, Münster region.', sibs:'Egid 1925–1944 · Franz 1930–2024 · Gertrud 1935–2019 · Maria 1939–2018' } },
-  kalle:     { sv:{ dates:'1884 – 1973 · "Kalle Bank"', bio:'"Kalle Bank" – ägde möbelaffären i Mjölby. Tages far.', sibs:'' }, en:{ dates:'1884 – 1973 · "Kalle Bank"', bio:'"Kalle Bank" – owned the furniture shop in Mjölby. Father of Tage.', sibs:'' } },
-  alma:      { sv:{ dates:'1888 – 1932',          bio:'Alma Maria Linder, Tages mor. Avled tidigt 1932.', sibs:'' }, en:{ dates:'1888 – 1932',          bio:"Alma Maria Linder, Tage's mother. Died early in 1932.", sibs:'' } },
-  alfred:    { sv:{ dates:'1863 – ? · Lysekil',   bio:'Alfred Bergman, från Lysekil. Lillians far.', sibs:'' }, en:{ dates:'1863 – ? · Lysekil',   bio:"Alfred Bergman, from Lysekil. Lilian's father.", sibs:'' } },
-  amanda:    { sv:{ dates:'1868 – ? · Bohuslän',  bio:'Amanda Strömberg, från Bohuslän. Lillians mor.', sibs:'' }, en:{ dates:'1868 – ? · Bohuslän',  bio:"Amanda Strömberg, from Bohuslän. Lilian's mother.", sibs:'' } },
-  petar:     { sv:{ dates:'† WWI (ca 1916–18)',   bio:'Petar Mitrovic, Cedas far. Stupade troligen under WWI – exakt plats och datum okänt.', sibs:'' }, en:{ dates:'† WWI (ca 1916–18)',   bio:"Petar Mitrovic, Ceda's father. Most likely fell during WWI; exact details unknown.", sibs:'' } },
-  stanija:   { sv:{ dates:'ca 1886 – ? · Zaječar', bio:'Stanija Blagojevic, Cedas mor. Från Zaječar-regionen i Serbien.', sibs:'Toza (Niš) · Dunja (Belgrad)' }, en:{ dates:'ca 1886 – ? · Zaječar', bio:"Stanija Blagojevic, Ceda's mother. From the Zaječar region of Serbia.", sibs:'Toza (Niš) · Dunja (Belgrade)' } },
-  willibald: { sv:{ dates:'1895 – 1940 · Borghorst', bio:'Willibald Lammerding, Käthes far. Födelseåret omtvistat (1895 eller 1897).', sibs:'' }, en:{ dates:'1895 – 1940 · Borghorst', bio:"Willibald Lammerding, Käthe's father. Birth year disputed (1895 or 1897).", sibs:'' } },
-  trudis:    { sv:{ dates:'1896 – 1977 · Borghorst', bio:'Gertrud Schräder, Käthes mor. Från Borghorst.', sibs:'Mathilde 1887 · Franz 1889 · Maria 1894 (T4?)' }, en:{ dates:'1896 – 1977 · Borghorst', bio:"Gertrud Schräder, Käthe's mother. From Borghorst.", sibs:'Mathilde 1887 · Franz 1889 · Maria 1894 (T4?)' } },
-  jovanovic: { sv:{ dates:'ca 1855–? · Soko Banja', bio:'Stanijas far, förnamn okänt.', sibs:'' }, en:{ dates:'ca 1855–? · Soko Banja', bio:"Stanija's father; first name unknown.", sibs:'' } },
-  hermann:   { sv:{ dates:'1858 – 1922 · Schöppingen', bio:'Hermann Lammerding, Wilibalds far. Verifierat via Matricula Online.', sibs:'' }, en:{ dates:'1858 – 1922 · Schöppingen', bio:"Hermann Lammerding, Willibald's father. Verified via Matricula Online.", sibs:'' } },
-  paula:     { sv:{ dates:'1862 – 1929',           bio:'Paula Vorspohl, Wilibalds mor.', sibs:'' }, en:{ dates:'1862 – 1929',           bio:"Paula Vorspohl, Willibald's mother.", sibs:'' } },
-  josefb:    { sv:{ dates:'1859 – 1930 · Borghorst', bio:'Josef Bernhard Schräder, Gertruds far. Hans andra hustrus namn är okänt.', sibs:'' }, en:{ dates:'1859 – 1930 · Borghorst', bio:"Josef Bernhard Schräder, Gertrud's father. His second wife's name is unknown.", sibs:'' } },
-  mkcordes:  { sv:{ dates:'1857 – 1904 · Alverskirchen', bio:'Maria Katharina Cordes, Gertruds mor. Från Alverskirchen.', sibs:'' }, en:{ dates:'1857 – 1904 · Alverskirchen', bio:"Maria Katharina Cordes, Gertrud's mother. From Alverskirchen.", sibs:'' } },
-};
-
-// ── State ──────────────────────────────────────────────────
 let lang = 'sv';
-let currentUser = null;
-let currentPid  = null;
-let panelOpen   = false;
-let db = null, auth = null;
 
-// ── Firebase ───────────────────────────────────────────────
-if (CONFIG.firebase && typeof firebase !== 'undefined') {
-  try {
-    firebase.initializeApp(CONFIG.firebase);
-    db   = firebase.firestore();
-    auth = firebase.auth();
-    auth.onAuthStateChanged(u => {
-      currentUser = u;
-      renderAuthUI();
-      if (panelOpen && currentPid) renderPanel(currentPid);
-    });
-  } catch(e) { console.warn('Firebase:', e); }
+// ════════════════════════════════════════════════════
+// PEOPLE DATA
+// fi = fatherId, mi = motherId
+// b = born, d = died, s = sex (M/F), c = color class
+// ════════════════════════════════════════════════════
+const P = {
+  lasse:     {n:"Lasse Nilsson",           b:"1975",          s:"M",c:"mix",fi:"leif",      mi:"marijana",
+             desc:"Lasse Nilsson, född i Älvsborg, Göteborg. Har rötter i tre länder: Sverige (Nilsson/Bergman från Mjölby och Lysekil), Serbien (Mitrovic/Blagojevic från Soko Banja) och Tyskland (Lammerding/Schräder från Borghorst).",
+             desc_de:"Lasse Nilsson, geboren in Älvsborg, Göteborg. Hat Wurzeln in drei Ländern: Schweden (Nilsson/Bergman aus Mjölby und Lysekil), Serbien (Mitrovic/Blagojevic aus Soko Banja) und Deutschland (Lammerding/Schräder aus Borghorst)."},
+  sanna:     {n:"Sanna Nilsson",           b:"1977",          s:"F",c:"mix",fi:"leif",      mi:"marijana"},
+  matti:     {n:"Matti Nilsson",           b:"1983",          s:"M",c:"mix",fi:"leif",      mi:"marijana"},
+  leif:      {n:"Leif Nilsson",            b:"1942",          s:"M",c:"sv", fi:"tage",      mi:"lilian"},
+  marijana:  {n:"Marijana Mitrovic",       b:"1946",          s:"F",c:"rs", fi:"ceda",      mi:"kathe"},
+  lillemor:  {n:"Lillemor Nilsson",        b:"1944",          s:"F",c:"sv", fi:"tage",      mi:"lilian"},
+  perolof:   {n:"Per-Olof Nilsson",        b:"1946",d:"1992", s:"M",c:"sv", fi:"tage",      mi:"lilian"},
+  elisabeth: {n:"Elisabeth Nilsson",       b:"1949",d:"2026", s:"F",c:"sv", fi:"tage",      mi:"lilian"},
+  tage:      {n:"Carl Tage Nilsson",       b:"1919",d:"1990", s:"M",c:"sv", fi:"kalle",     mi:"alma"},
+  lilian:    {n:"Lilian Karlsson",          b:"1920",d:"2000", s:"F",c:"svb",fi:"olof",      mi:"elsa",
+             desc:"Lilian Aurora Karlsson, gift Nilsson. Född 3.7.1920 i Lyse, Bohuslän. Dog 25.2.2000, begravd på sin födelsedag 3.7.2000. Dotter till stenhuggaren Olof Hilmer Carlsson och Elsa Charlotta Bergman. Gift med Carl Tage Nilsson (~1940 Mjölby). OBS: Tidigare felaktigt listad som 'Bergman' — Bergman var moderns flicknamn. Källa: Riksarkivet 1930, Svenskagravar.se ✅ + Muntligt fr Leif Nilsson ✅.",
+             desc_de:"Lilian Aurora Karlsson, verh. Nilsson. Geb. 3.7.1920 in Lyse, Bohuslän. Gest. 25.2.2000, begraben an ihrem Geburtstag 3.7.2000. Tochter von Olof Hilmer Carlsson und Elsa Charlotta Bergman. Früher fälschlicherweise als 'Bergman' geführt — Bergman war der Mädchenname ihrer Mutter."},
+  ceda:      {n:"Cedomir Mitrovic",        b:"1912",d:"1981", s:"M",c:"rs", fi:"petar",     mi:"stanija",
+             desc:"Cedomir \"Ceda\" Mitrovic, uppvuxen i Soko Banja. Gick i militärskola och tjänstgjorde i Pirot (1937–40) och Niš. Angiven och arresterad i Niš juli 1942. Fängslad i Belgrad aug–okt 1942. Deporterades till KZ Mauthausen (okt 1942), sedan Auschwitz/Birkenau/Dora (april 1943–jan 1945), Nordhausen (jan–mars 1945) och Bergen-Belsen (mars–april 1945). Befriad av engelsmännen 15 april 1945. Träffade Käthe i DP-lägret Borghorst. Bosatte sig i Münster 1950, köpte hus i Zaječar till sin mor ~1962. Födelseår 1912 bekräftat via Arolsen Archives (4 primärkällor).",
+             desc_de:"Cedomir \"Ceda\" Mitrovic, aufgewachsen in Soko Banja. Besuchte eine Militärschule und diente in Pirot (1937–40) und Niš. Im Juli 1942 in Niš denunziert und verhaftet. Aug.–Okt. 1942 in Belgrad inhaftiert. Deportiert ins KZ Mauthausen (Okt. 1942), dann Auschwitz/Birkenau/Dora (April 1943–Jan. 1945), Nordhausen (Jan.–März 1945) und Bergen-Belsen (März–April 1945). Am 15. April 1945 von den Briten befreit. Lernte Käthe im DP-Lager Borghorst kennen. Ließ sich 1950 in Münster nieder, kaufte ~1962 ein Haus in Zaječar für seine Mutter. Geburtsjahr 1912 durch Arolsen Archives bestätigt (4 Primärquellen)."},
+  kathe:     {n:"Käthe Lammerding",        b:"1926",d:"2009", s:"F",c:"de", fi:"willibald", mi:"trudis",
+             desc:"Katharina Mathilde Josefine Lammerding, kallad Käthe. Född i Borghorst, dotter till Willibald och Gertrud (Trudis). Träffade Ceda Mitrovic i DP-lägret Borghorst efter kriget. Gifte sig och fick tre döttrar: Marijana, Vera och Jela.",
+             desc_de:"Katharina Mathilde Josefine Lammerding, genannt Käthe. Geboren in Borghorst, Tochter von Willibald und Gertrud (Trudis). Lernte Ceda Mitrovic im DP-Lager Borghorst nach dem Krieg kennen. Heiratete ihn und bekam drei Töchter: Marijana, Vera und Jela."},
+  annemarie: {n:"Anne-Marie Nilsson",      b:"1917",          s:"F",c:"sv", fi:"kalle",     mi:"alma"},
+  yngve:     {n:"Carl Yngve Nilsson",      b:"1924",d:"1973", s:"M",c:"sv", fi:"kalle",     mi:"alma"},
+  hulda:     {n:"Hulda Maria Carlsson",    b:"1908",          s:"F",c:"svb",fi:"olof",      mi:"elsa"},
+  torelof:   {n:"Tor Elof Carlsson",       b:"1910",          s:"M",c:"svb",fi:"olof",      mi:"elsa"},
+  gurlier:   {n:"Gurli Erika Carlsson",    b:"1910",          s:"F",c:"svb",fi:"olof",      mi:"elsa",
+             desc:"Gurli Erika Carlsson, *30.11.1910 Lysekil. Dotter till Olof Hilmer Carlsson och Elsa Charlotta Bergman. ✅ Riksarkivet dopbok 1910 rad 152. Öde oklart — ej i folkräkningarna. Familjens muntliga uppgift: dog i spanska sjukan ~1918–1919, ~8 år gammal. ⚠️ EJ VERIFIERAT — dödsåret bör bekräftas i kyrkböcker (Lysekil/Lyse dödbok 1917–1920). Notering 'II F2e' i dopboken — betydelse oklar.",
+             desc_de:"Gurli Erika Carlsson, *30.11.1910 Lysekil. Schicksal ungeklärt. Mündlich: gestorben an Spanischer Grippe ~1918–1919. ⚠️ Nicht verifiziert."},
+  karin:     {n:"Karin Solgund Carlsson",  b:"1923",          s:"F",c:"svb",fi:"olof",      mi:"elsa"},
+  mile:      {n:"Milorad Blagojevic",      b:"~1900",         s:"M",c:"rs", fi:null,        mi:"stanija"},
+  dimitri:   {n:"Dimitri (försvunnen)",    b:null,            s:"M",c:"rs", fi:null,        mi:"stanija"},
+  egid:      {n:"Egid Ä. Lammerding",      b:"1925",d:"1944", s:"M",c:"de", fi:"willibald", mi:"trudis",
+             desc:"Egid Ägidius Lammerding, Gefreiter i tyska armén. Försvann 13 mars 1944 vid fronten i Ukraina (Bjerdytschew/Dwinitza/Raum Winnitza) under reträtt, bara 18 år gammal. Enligt Lasses gammelmormor träffades han av ett skott i huvudet (Kopfschuß) — han dog troligen på plats men det bekräftades aldrig officiellt, därav status \\\"vermisst\\\" (saknad). Associerad krigskyrkogård: Kyjiw.",
+             desc_de:"Egid Ägidius Lammerding, Gefreiter. Am 13. März 1944 beim Rückzug an der Front in der Ukraine (Bjerdytschew/Dwinitza/Raum Winnitza) vermisst gemeldet, nur 18 Jahre alt. Laut mündlicher Überlieferung (Lasses Urgroßmutter) traf ihn ein Kopfschuss — er starb wahrscheinlich vor Ort, wurde aber nie offiziell bestätigt, daher Status \\\"vermisst\\\". Zugehöriger Kriegsfriedhof: Kyjiw.",
+             x:"Kopfschuß, reträtt – vermisst, ej bekräftat"},
+  franzl:    {n:"Franz Lammerding",        b:"1930",d:"2024", s:"M",c:"de", fi:"willibald", mi:"trudis"},
+  gertrudl:  {n:"Gertrud Lammerding",      b:"1935",d:"2019", s:"F",c:"de", fi:"willibald", mi:"trudis"},
+  vera:      {n:"Vera Mitrovic",           b:"1950",          s:"F",c:"rs", fi:"ceda",      mi:"kathe"},
+  jela:      {n:"Jela Mitrovic",           b:"1953",          s:"F",c:"rs", fi:"ceda",      mi:"kathe"},
+  marial:    {n:"Maria Lammerding",        b:"1939",d:"2018", s:"F",c:"de", fi:"willibald", mi:"trudis"},
+  kalle:     {n:"Carl August Nilsson",     b:"1884",d:"1973", s:"M",c:"sv", fi:null,        mi:null,  x:'"Kalle Bank"',
+             desc:"Carl August Nilsson, känd som \"Kalle Bank\". Möbelfabrikstapetserare i Mjölby, ägde möbelaffär på S:t Persgatan 5 med tre anställda. Affären brann ned (även grannaffären), orsaken är okänd. Efterlämnade tre barn: Anne-Marie, Tage och Yngve.",
+             desc_de:"Carl August Nilsson, bekannt als \"Kalle Bank\". Möbeltapezierer in Mjölby, besaß ein Möbelgeschäft in der S:t Persgatan 5 mit drei Angestellten. Das Geschäft brannte ab (auch das Nachbargeschäft), Ursache unbekannt. Hinterließ drei Kinder: Anne-Marie, Tage und Yngve."},
+  andersandersson: {n:"Anders Andersson",  b:"ca 1826",       s:"M",c:"sv", fi:null, mi:null,
+             desc:"Anders Andersson, torpare i Mjölby (*ca 1826). Bodde vid Brunnsvig, Mjölby Norrgård. Gift med Hedda Sofia Nilsdotter. Barn: Johanna Sofia *1854, Carl August *1863, Anders Gustaf *1865, Hilda Maria *1868, Frans Johan *1871 m.fl. 📷 Kabinettfotografi finns (fotograf Carl Nilsson, Norrköping). Baksida: 'Anders Andersson / August Linders far'. ✅ Källa: Mjölbybor s.44 + HFL AI:29 sid.347.",
+             desc_de:"Anders Andersson, Torpare in Mjölby (*ca. 1826). Brunnsvig, Mjölby Norrgård. 📷 Kabinettphotographie vorhanden. ✅ Quelle: HFL AI:29 S.347."},
+  heddasofia:{n:"Hedda Sofia Nilsdotter",  b:"ca 1831",       s:"F",c:"sv", fi:null, mi:null,
+             desc:"Hedda Sofia Nilsdotter (*ca 1831 Mjölby). Torparhustru, gift med Anders Andersson, Brunnsvig. 📷 Kabinettfotografi finns — baksida: 'Hedvig Andersson / August Linders mor'. ✅ Källa: Mjölbybor s.44 + HFL AI:29 sid.347.",
+             desc_de:"Hedda Sofia Nilsdotter (*ca. 1831). Ehefrau von Anders Andersson, Brunnsvig. 📷 Kabinettphotographie vorhanden. ✅ Quelle: HFL AI:29 S.347."},
+  augustl:   {n:"Carl August Linder",      b:"25.1.1863",d:"5.11.1935", s:"M",c:"sv", fi:"andersandersson", mi:"heddasofia",
+             desc:"Carl August Linder (*25.1.1863 Mjölby †5.11.1935 Mjölby). Murare vid vigseln 1887, senare kvarnmästare. Förf. 'Krönika fr gamla Mjölby'. Lindergatan i Mjölby är uppkallad efter honom. Gift 25.9.1887 med Hilda Carolina Gustafsdotter. Son till torparen Anders Andersson (*1826) och Hedda Sofia Nilsdotter (*1831), Brunnsvig, Mjölby Norrgård. ✅ Källa: Mjölbybor s.44 + vigselbok C:6 + HFL AI:29 sid.347.",
+             desc_de:"Carl August Linder (*25.1.1863 †5.11.1935 Mjölby). Maurer bei der Heirat 1887, später Mühlenmeister. Verfasser einer Chronik. Heirat 25.9.1887 mit Hilda Carolina Gustafsdotter. ✅ Quelle: Mjölbybor + Trauungsbuch C:6 + HFL AI:29 S.347."},
+  thurel:    {n:"Carl Thure Linder",       b:"1889",d:"1981", s:"M",c:"sv", fi:"augustl",   mi:"hildac",
+             desc:"Carl Thure Linder (*1889 †1981). Bror till Alma Maria Linder. Gift med Augusta Alexandersson. Källa: Mjölbybor (1981) s.44 ✅"},
+  viktorial: {n:"Viktoria Linder",         b:"1892",d:"1907", s:"F",c:"sv", fi:"augustl",   mi:"hildac",
+             desc:"Viktoria Linder (*1892 †1907), dog 15 år gammal. Syster till Alma. Källa: Mjölbybor (1981) s.44 ✅"},
+  axell:     {n:"Axel Linder",             b:"1896",d:"1979", s:"M",c:"sv", fi:"augustl",   mi:"hildac",
+             desc:"Axel Linder (*1896 †1979), ritkontorschef. Bror till Alma. Gift med Agda Björk. Källa: Mjölbybor (1981) s.44 ✅"},
+  ellenl:    {n:"Ellen Linder",            b:"1900",          s:"F",c:"sv", fi:"augustl",   mi:"hildac",
+             desc:"Ellen Linder (*1900), telefonist i Mjölby. Yngsta syster till Alma. Troligen 'moster Ellen' dit Annmari Nilsson flyttade efter Almas bortgång 1932. 📷 Foto finns i familjens ägo. Källa: Mjölbybor (1981) s.44 ✅"},
+  hildac:    {n:"Hilda Carolina Gustafson", b:"23.2.1865",     s:"F",c:"sv", fi:"fransgg",   mi:"christinaa",
+             desc:"Hilda Carolina Gustafson, strykerska, född 23.2.1865 i Mjölby (Alby Södergård). Dotter till arbetaren Frans Gustaf Gustafsson och Christina Andersdotter (*1840 Högby). Bodde med modern på Mjölby fattigstuga 1880–1886, därefter Finstugan (Finshagen). Gift 25.9.1887 med Carl August Linder (murare) i Mjölby av komminister K.B. Larsson. ✅ Bekräftat i tre primärkällor: dopbok CI:4, vigselbok C:6, HFL AI:27+AI:29. Linder-pärmens uppgift om Gustaf Hindrik som far är ett generationsfel — Gustaf Hindrik är hennes farfar.",
+             desc_de:"Hilda Carolina Gustafson, Wäscherin, geb. 23.2.1865 in Mjölby. Tochter von Arbeiter Frans Gustaf Gustafsson und Christina Andersdotter (*1840 Högby). Heirat 25.9.1887 mit Carl August Linder. ✅ Bestätigt in drei Primärquellen: Taufbuch CI:4, Trauungsbuch C:6, Hausexamenslisten AI:27+AI:29."},
+  carlgustafg:{n:"Carl Gustaf Gustafson",   b:"16.1.1863",     s:"M",c:"sv", fi:"fransgg",   mi:"christinaa",
+             desc:"Carl Gustaf Gustafson, född 16.1.1863 i Mjölby. Bror till Hilda Carolina Gustafsdotter (*1865). Son till arbetare Frans Gustaf Gustafsson och Christina Andersdotter. ✅ Källa: HFL AI:27 sid.364, Mjölby Fattigstuga, SE/VALA/00249/A I/27.",
+             desc_de:"Carl Gustaf Gustafson, geb. 16.1.1863 in Mjölby. Bruder von Hilda Carolina. ✅ Quelle: HFL AI:27 S.364."},
+  fransgg:   {n:"Frans Gustaf Gustafsson",  b:"ca 1841",       s:"M",c:"sv", fi:"gustafh",   mi:"annabn",
+             desc:"Frans Gustaf Gustafsson, arbetare i Mjölby. Son till Gustaf Hindrik Gustafsson (*1816) och Anna Brita Nilsdotter — listad bland deras barn i Linder-pärmens Nr 4. Gift ca 1862 med Christina Andersdotter (*1840 Högby). Barn: Carl Gustaf *16.1.1863 och Hilda Carolina *23.2.1865. Dog före 1880 (hustrun änka i HFL 1880–1884). ✅ Bekräftat indirekt via dopbok CI:4 + HFL AI:27 sid.364.",
+             desc_de:"Frans Gustaf Gustafsson, Arbeiter in Mjölby. Sohn von Gustaf Hindrik Gustafsson und Anna Brita Nilsdotter. Verheiratet ca. 1862 mit Christina Andersdotter. Kinder: Carl Gustaf *1863, Hilda Carolina *1865. Gest. vor 1880."},
+  christinaa:{n:"Christina Andersdotter",   b:"30.9.1840",     s:"F",c:"sv", fi:null,         mi:null,
+             desc:"Christina Andersdotter, förestånderska vid Mjölby fattigstuga 1880–1890. Född 30.9.1840 i Högby, Östergötland. Gift ca 1862 med Frans Gustaf Gustafsson (†före 1880), änka därefter. Barn: Carl Gustaf *16.1.1863, Hilda Carolina *23.2.1865. Inflyttad till Mjölby 1864. ✅ Källa: HFL AI:27 sid.364 + AI:29 sid.393, SE/VALA/00249.",
+             desc_de:"Christina Andersdotter, Vorsteherin des Armenhauses Mjölby 1880–1890. Geb. 30.9.1840 in Högby. Verheiratet ca. 1862 mit Frans Gustaf Gustafsson. Kinder: Carl Gustaf *1863, Hilda Carolina *1865. ✅ Quelle: HFL AI:27 S.364 + AI:29 S.393."},
+  oskarfg:   {n:"Oskar Fredrik Gustafsson", b:"1856",          s:"M",c:"sv", fi:"gustafh",   mi:"annabn",
+             desc:"Oskar Fredrik Gustafsson Lindgren, född 23.6.1856 i Mjölby. Son till Gustaf Hindrik Gustafsson och Anna Brita Nilsdotter — alltså bror till Frans Gustaf Gustafsson och därigenom FARBROR till Hilda Carolina Gustafsdotter (*1865). OBS: Linder-pärmen kallar honom 'bror till Hilda' — troligt fel, korrekt relation är farbror. Gift med Johanna Carolina Andersdotter (*14.3.1849 Vreta kloster). Baptister. Flyttade till Kristinehamn 2.7.1893. Källa: Linder-pärmens Nr 2 ✅.",
+             desc_de:"Oskar Fredrik Gustafsson Lindgren, geb. 23.6.1856 in Mjölby. Sohn von Gustaf Hindrik Gustafsson — also Onkel (nicht Bruder) von Hilda Carolina Gustafsdotter. Baptisten. Zog 1893 nach Kristinehamn. Quelle: Nr. 2 im Linder-Ordner ✅."},
+  gustafh:   {n:"Gustaf Hindrik Gustafsson", b:"14.8.1816",   s:"M",c:"sv", fi:null,        mi:"mariaad",
+             desc:"Gustaf Hindrik Gustafsson, född 14.8.1816 i Casabög/Ödeshög. Oäkta son till pigan Maria (Margareta) Adamsdotter — faderns namn okänt. Kvarnbyggnästare/mjölnare. Gift 11.7.1839 med Anna Brita Nilsdotter i Mjölby. Dog 22.4.1863 i Mjölby av lungsot (tbc). Barn: Frans Gustaf *1841, Johan Adolf *1843, Clara *1846, Anna Mathilda *1848, Johanna *1852, Oskar Fredrik *1856, Otto *1859. Källa: Linder-pärmens Nr 4 ✅ bildbevisat (03-nr04-05-06.heic).",
+             desc_de:"Gustaf Hindrik Gustafsson, geb. 14.8.1816 in Casabög/Ödeshög. Unehelicher Sohn von Maria Adamsdotter — Vater unbekannt. Mühlenmeister. Heirat 11.7.1839 mit Anna Brita Nilsdotter. Gest. 22.4.1863 an Tuberkulose. Quelle: Nr. 4 im Linder-Ordner ✅."},
+  mariaad:   {n:"Maria Adamsdotter",        b:"12.8.1793",    s:"F",c:"sv", fi:null,        mi:null,
+             desc:"Maria (Margareta) Adamsdotter, född 12.8.1793 i Ödeshög. Dotter till mjölnaren Adam Svensson (Nr 16) och Cajsa Johansdotter (Nr 17) på Örrmäs. Piga — fick oäkta sonen Gustaf Hindrik Gustafsson *1816. Anges som 'klen' i 1843 års längd, skickades till fattighuset. Dödsnotis ej påträffad. Källa: Linder-pärmens Nr 8/9 (04-nr07-10.heic).",
+             desc_de:"Maria (Margareta) Adamsdotter, geb. 12.8.1793 in Ödeshög. Tochter von Adam Svensson und Cajsa Johansdotter. Magd — unehelicher Sohn Gustaf Hindrik *1816. Quelle: Nr. 8 im Linder-Ordner."},
+  annabn:    {n:"Anna Brita Nilsdotter",    b:"21.9.1814",    s:"F",c:"sv", fi:"nilsmans",  mi:"britahel",
+             desc:"Anna Brita Nilsdotter, född 21.9.1814 i Åsbo. Dotter till torparen Nils Månsson (*1774 Åsbo) och Brita Helena Larsdotter (*1779). Gift 11.7.1839 med Gustaf Hindrik Gustafsson. Dog 1.5.1876 i Mjölby. Kallas 'Lindgren' i 1869–1874 års längder. Källa: Linder-pärmens Nr 5 ✅ bildbevisat (03-nr04-05-06.heic).",
+             desc_de:"Anna Brita Nilsdotter, geb. 21.9.1814 in Åsbo. Tochter von Nils Månsson (*1774) und Brita Helena Larsdotter (*1779). Heirat 1839 mit Gustaf Hindrik Gustafsson. Gest. 1.5.1876. Quelle: Nr. 5 im Linder-Ordner ✅."},
+  nilsmans:  {n:"Nils Månsson",             b:"17.8.1774",    s:"M",c:"sv", fi:null,        mi:null,
+             desc:"Nils Månsson, född 17.8.1774 i Åsbo. Torpare på Kruttorpet. Föräldrar: Måns Svensson (Nr 20) och Maria Olofsdotter (Nr 21). Gift 14.5.1802 i Åsbo med Brita Lena Larsdotter från Norra Kvisselhutt. Barn: Lena Kajsa *1803, Maja Lisa *1806, Sven *1810, Anna Brita *1814. Källa: Linder-pärmens Nr 10 ✅ bildbevisat (04-nr07-10.heic).",
+             desc_de:"Nils Månsson, geb. 17.8.1774 in Åsbo. Torpare. Heirat 1802 mit Brita Lena Larsdotter. Vater von Anna Brita Nilsdotter (*1814). Quelle: Nr. 10 im Linder-Ordner ✅."},
+  britahel:  {n:"Brita Helena Larsdotter",  b:"6.11.1779",    s:"F",c:"sv", fi:"larsmag",   mi:"catharinasv",
+             desc:"Brita Helena Larsdotter, född 6.11.1779 i Åsbo. Döpt 'Brita Helena' men kallad 'Brita Lena'. Dotter till hemmansbrukaren Lars Månsson (Nr 22) och Catharina Svensdotter (Nr 23), Norra Krisshult. Gift 14.6.1802 med Nils Månsson. Dog 27.10.1841 i Mjölby. Källa: Linder-pärmens Nr 11 ✅ bildbevisat (05-nr11-13.heic). ⚠️ Tidigare felaktigt angiven som 'Evita Helena Larsdotter *1775' — rättat 2026-03-01.",
+             desc_de:"Brita Helena Larsdotter, geb. 6.11.1779 in Åsbo. Genannt 'Brita Lena'. Tochter von Lars Månsson und Catharina Svensdotter. Gest. 27.10.1841. ✅ Bildbewiesen. Quelle: Nr. 11 im Linder-Ordner."},
+  larsmag:   {n:"Lars Magnusson",           b:"1747",         s:"M",c:"sv", fi:null,        mi:null,
+             desc:"Lars Månsson/Magnusson, född 25.9.1747 i Åsbo. Far till Brita Helena Larsdotter (*6.11.1779). Källa: Linder-pärmens Nr 22 (07-nr19-22.heic).",
+             desc_de:"Lars Månsson/Magnusson, geb. 25.9.1747 in Åsbo. Vater von Brita Helena Larsdotter (*1779). Quelle: Ahnentafel-Dokument, Nr. 22."},
+  catharinasv:{n:"Catharina Svensdotter",   b:"1762",         s:"F",c:"sv", fi:null,        mi:null,
+             desc:"Catharina Svensdotter, född 13.3.1762. Mor till Brita Helena Larsdotter (*1779). Källa: Linder-pärmens Nr 23 (08-nr22-26.heic).",
+             desc_de:"Catharina Svensdotter, geb. 13.3.1762. Mutter von Brita Helena Larsdotter (*1779). Quelle: Ahnentafel-Dokument, Nr. 23."},
+  alma:      {n:"Alma Maria Linder",       b:"1888",d:"1932", s:"F",c:"sv", fi:"augustl",   mi:"hildac",
+             desc:"Alma Maria Linder, gift med Kalle Bank. Dog 1932 vid 43 års ålder i sjukdom — Yngve var bara 7 år gammal när hon gick bort. Begravd i Mjölby. Föräldrar: Carl August Linder (kvarnarbetare) och Hilda Carolina Gustafson — bekräftat i folkräkning 1890.",
+             desc_de:"Alma Maria Linder, verheiratet mit Kalle Bank. Starb 1932 im Alter von 43 Jahren — Yngve war erst 7 Jahre alt. In Mjölby begraben. Eltern: Carl August Linder und Hilda Carolina Gustafson — bestätigt in der Volkszählung 1890."},
+  carlolausen:{n:"Carl Olausen",            b:"1858",d:"2.4.1937",s:"M",c:"svb",fi:null,    mi:null,
+             desc:"Carl Olausen, *1858, †2 april 1937 i Roppestad, Norge. Far till Olof Hilmer Carlsson. Stenhuggare och sjöman. Syndikalist. Under kriget (troligen 1:a världskriget) odlade han kaniner som slaktades och åts — sannolikt ett överlevnadsminne. ✅ Muntligt fr Leif Nilsson.",
+             desc_de:"Carl Olausen, *1858, †2. April 1937 in Roppestad, Norwegen. Vater von Olof Hilmer Carlsson. Steinmetz und Seemann. Syndikalist. Kaninchenzucht während des Krieges. ✅ Mündlich von Leif Nilsson."},
+  olof:      {n:"Olof Hilmer Carlsson",    b:"1883",          s:"M",c:"svb",fi:"carlolausen",mi:null,
+             desc:"Olof Hilmer Carlsson, *9.12.1883 Hogdal, Bohuslän. Stenhuggare; jobbade i Norrland och Norge. Gift 15.3.1908 med Elsa Charlotta Bergman; inflyttad till Lyse från Lysekil 1913. Son till Carl Olausen (*1858 †2.4.1937 Roppestad, Norge). ✅ Riksarkivet dopbok 1910.",
+             desc_de:"Olof Hilmer Carlsson, *9.12.1883 Hogdal, Bohuslän. Steinmetz; arbeitete in Norrland und Norwegen. Heirat 15.3.1908 mit Elsa Charlotta Bergman. Sohn von Carl Olausen (*1858 †1937 Roppestad). ✅ Reichsarchiv Taufbuch 1910."},
+  elsa:      {n:"Elsa Charlotta Bergman",  b:"1890",          s:"F",c:"svb",fi:"alfred",    mi:"amanda"},
+  petar:     {n:"Petar Mitrovic",          b:null, d:"~1917", s:"M",c:"rs", fi:null,        mi:null,  x:"†WWI"},
+  stanija:   {n:"Stanija Blagojevic",      b:"~1886",         s:"F",c:"rs", fi:"jovanovic", mi:null,
+             desc:"Stanija Blagojevic (f. Jovanovic), från Soko Banja. Hennes far ägde kvarn och gästhus nära staden. Fick tre söner med oklart om de hade samma far. Äldste sonen Milorad (Mile) bodde kvar i Zaječar; mellanbroder Dimitri försvann spårlöst vid bulgariska gränsen; yngste sonen Ceda överlevde Förintelsen. Stanija dog i Zaječar, år okänt.",
+             desc_de:"Stanija Blagojevic (geb. Jovanovic), aus Soko Banja. Ihr Vater besaß eine Mühle und ein Gasthaus in der Nähe der Stadt. Bekam drei Söhne, möglicherweise von verschiedenen Vätern. Ältester Sohn Milorad (Mile) blieb in Zaječar; Sohn Dimitri verschwand spurlos an der bulgarischen Grenze; jüngster Sohn Ceda überlebte den Holocaust. Stanija starb in Zaječar, Todesjahr unbekannt."},
+  willibald: {n:"Willibald Lammerding",    b:"1895",d:"1940", s:"M",c:"de", fi:"hermann",   mi:"paula",
+             desc:"Willibald Lammerding, son till skräddarmästaren Hermann. Födelseår 1895 bekräftat i dopbok St. Nikomedes, Borghorst (Matricula Online, nr 142) — döpt 14.7.1895, faddrar: Willibald Vorspohl och Sophia H. Jahreing. Dog 10 juni 1940 i Borghorst.",
+             desc_de:"Willibald Lammerding, Sohn des Schneidermeisters Hermann. Geburtsjahr 1895 bestätigt im Taufbuch St. Nikomedes, Borghorst (Matricula Online, Nr. 142) — getauft am 14.7.1895, Taufpaten: Willibald Vorspohl und Sophia H. Jahreing. Gestorben am 10. Juni 1940 in Borghorst."},
+  trudis:    {n:"Gertrud Schräder",        b:"1896",d:"1977", s:"F",c:"de", fi:"josefb",    mi:"mkcordes"},
+  toza:      {n:"Toza Blagojevic",         b:null,            s:"M",c:"rs", fi:"jovanovic", mi:null,  x:"Niš"},
+  dunja:     {n:"Dunja",                   b:null,            s:"F",c:"rs", fi:"jovanovic", mi:null,  x:"Belgrad"},
+  mathildes: {n:"Mathilde Schräder",       b:"1887",          s:"F",c:"de", fi:"josefb",    mi:"mkcordes"},
+  franzs:    {n:"Franz Schräder",          b:"1889",          s:"M",c:"de", fi:"josefb",    mi:"mkcordes"},
+  marias:    {n:"Maria Schräder",          b:"1894",          s:"F",c:"de", fi:"josefb",    mi:"mkcordes", x:"T4?"},
+  alfred:    {n:"Alfred Bergman",          b:"1863",          s:"M",c:"svb",fi:null,        mi:null,  x:"Lysekil"},
+  amanda:    {n:"Amanda Strömberg",        b:"1868",          s:"F",c:"svb",fi:null,        mi:null},
+  jovanovic: {n:"Jovanovic (far)",         b:"~1855",         s:"M",c:"rs", fi:null,        mi:null,  x:"Soko Banja"},
+  hermann:   {n:"Hermann Lammerding",      b:"1858",d:"1922", s:"M",c:"de", fi:"bernhard",  mi:"elisabethw"},
+  paula:     {n:"Paula Vorspohl",          b:"1862",d:"1929", s:"F",c:"de", fi:"heinrichv", mi:"anna_s"},
+  josefb:    {n:"Josef B. Schräder",       b:"1859",d:"1930", s:"M",c:"de", fi:"heinrichs", mi:"antonette"},
+  mkcordes:  {n:"Maria K. Cordes",         b:"1857",d:"1904", s:"F",c:"de", fi:"theodor",   mi:"mkteves"},
+  bernhard:  {n:"Bernhard Lammerding",     b:null,            s:"M",c:"de", fi:null,        mi:null},
+  elisabethw:{n:"Elisabeth Wewermann",     b:null,            s:"F",c:"de", fi:null,        mi:null},
+  heinrichv: {n:"Heinrich Vorpohl",        b:"1829",          s:"M",c:"de", fi:null,        mi:null},
+  anna_s:    {n:"Anna Spenneberg",         b:"1831",          s:"F",c:"de", fi:null,        mi:null},
+  heinrichs: {n:"Heinrich Schräder",       b:null,            s:"M",c:"de", fi:null,        mi:null},
+  antonette: {n:"Antonette Laumann",       b:null,            s:"F",c:"de", fi:null,        mi:null},
+  theodor:   {n:"Theodor Cordes",          b:null,            s:"M",c:"de", fi:null,        mi:null},
+
+  // Partners gen 0
+  jorg:     {n:"Jörg Teichgraeber",   b:"1972", s:"M", c:"mix", fi:null,      mi:null},
+  alaya:    {n:"Alaya",               b:"1986", s:"F", c:"mix", fi:null,      mi:null},
+  // Barnbarn (Sannas och Mattis barn)
+  malva:    {n:"Malva",               b:"2021", s:"F", c:"mix", fi:"jorg",    mi:"sanna"},
+  milo_t:   {n:"Milo",                b:"2025", s:"M", c:"mix", fi:"jorg",    mi:"sanna"},
+  alma_c:   {n:"Alma",                b:"2021", s:"F", c:"mix", fi:"matti",   mi:"alaya"},
+  vide:     {n:"Vide",                b:"2023", s:"M", c:"mix", fi:"matti",   mi:"alaya"},
+  // Veras barn
+  tom_h:    {n:"Tom Hartmann",        b:"1973", s:"M", c:"rs",  fi:null,      mi:"vera"},
+  jana_s:   {n:"Jana",                b:"1980", s:"F", c:"rs",  fi:null,      mi:"vera"},
+  // Jelas barn
+  julian_s: {n:"Julian Siegler",      b:"1982", s:"M", c:"rs",  fi:null,      mi:"jela"},
+  philipp_k:{n:"Philipp Kirchner",    b:"1988", s:"M", c:"rs",  fi:null,      mi:"jela"},
+  // Anne-Maries barn (Huskvarna)
+  hans_am:  {n:"Hans",                b:null,   s:"M", c:"sv",  fi:null,      mi:"annemarie"},
+  karin_am: {n:"Karin",               b:null,   s:"F", c:"sv",  fi:null,      mi:"annemarie"},
+  gunnar_am:{n:"Gunnar",              b:null,   s:"M", c:"sv",  fi:null,      mi:"annemarie"},
+  // Elisabeths döttrar
+  linda:    {n:"Linda Greider",       b:null,   s:"F", c:"sv",  fi:null,      mi:"elisabeth"},
+  liza:     {n:"Liza Nilsson",        b:null,   s:"F", c:"sv",  fi:null,      mi:"elisabeth"},
+  // Huldas barn
+  rustan:   {n:"Rustan Jonsson",      b:null,   s:"M", c:"svb", fi:null,      mi:"hulda",
+            desc:"Rustan Jonsson. Son till Hulda Maria Carlsson och Kjell Jonsson, Lysekil. Dog i cancer. ✅ Muntligt fr Leif Nilsson."},
+  sverker:  {n:"Sverker Jonsson",     b:null,   s:"M", c:"svb", fi:null,      mi:"hulda",
+            desc:"Sverker Jonsson. Son till Hulda Maria Carlsson och Kjell Jonsson, Lysekil. Fick två barn: en son (bor ev. i Göteborg) och en dotter. ✅ Muntligt fr Leif Nilsson."},
+  // Sverkers barn
+  sonsvk:   {n:"Son (Sverkers)",      b:null,   s:"M", c:"svb", fi:"sverker", mi:null},
+  dottersvk:{n:"Dotter (Sverkers)",   b:null,   s:"F", c:"svb", fi:"sverker", mi:null},
+  // Tor Elofs barn
+  ralf:     {n:"Ralf",                b:null,   s:"M", c:"svb", fi:"torelof", mi:null},
+  torleif:  {n:"Tor-Leif",            b:null,   s:"M", c:"svb", fi:"torelof", mi:null},
+  annalena: {n:"Anna-Lena",           b:null,   s:"F", c:"svb", fi:"torelof", mi:null},
+  // Karins son
+  magnus:   {n:"Magnus Linér",        b:null,   s:"M", c:"svb", fi:null,      mi:"karin"},
+  // Franz Lammerdings barn
+  ruth_l:   {n:"Ruth",                b:"1964", s:"F", c:"de",  fi:"franzl",  mi:null},
+  rolf_l:   {n:"Rolf",                b:"1965", s:"M", c:"de",  fi:"franzl",  mi:null},
+  ute_l:    {n:"Ute",                 b:"1966", s:"F", c:"de",  fi:"franzl",  mi:null},
+  elke_l:   {n:"Elke",                b:"1966", s:"F", c:"de",  fi:"franzl",  mi:null},
+  stefan_l: {n:"Stefan",              b:"1967", s:"M", c:"de",  fi:"franzl",  mi:null},
+  // Gertrud Lammerdings son
+  udo:      {n:"Udo Schubert",        b:"1963", s:"M", c:"de",  fi:null,      mi:"gertrudl"},
+  mkteves:   {n:"Maria K. Teves",          b:null,            s:"F",c:"de", fi:null,        mi:null},
+
+  // ── Gustaf Hindrik Gustafssons övriga barn (utöver fransgg och oskarfg) ──
+  johanadolfg:  {n:"Johan Adolf Gustafsson",  b:"1843", s:"M",c:"sv", fi:"gustafh", mi:"annabn",
+                 desc:"Johan Adolf Gustafsson, *ca 1843 Mjölby. Son till Gustaf Hindrik Gustafsson och Anna Brita Nilsdotter. Källa: Linder-pärmens Nr 4 ✅.",
+                 desc_de:"Johan Adolf Gustafsson, *ca. 1843 Mjölby. Sohn von Gustaf Hindrik Gustafsson und Anna Brita Nilsdotter. Quelle: Nr. 4 im Linder-Ordner ✅."},
+  clarag:       {n:"Clara Gustafsson",         b:"1846", s:"F",c:"sv", fi:"gustafh", mi:"annabn",
+                 desc:"Clara Gustafsson, *ca 1846 Mjölby. Dotter till Gustaf Hindrik Gustafsson och Anna Brita Nilsdotter. Källa: Linder-pärmens Nr 4 ✅.",
+                 desc_de:"Clara Gustafsson, *ca. 1846 Mjölby. Tochter von Gustaf Hindrik Gustafsson und Anna Brita Nilsdotter. Quelle: Nr. 4 im Linder-Ordner ✅."},
+  annamathildag:{n:"Anna Mathilda Gustafsson", b:"1848", s:"F",c:"sv", fi:"gustafh", mi:"annabn",
+                 desc:"Anna Mathilda Gustafsson, *ca 1848 Mjölby. Dotter till Gustaf Hindrik Gustafsson och Anna Brita Nilsdotter. Källa: Linder-pärmens Nr 4 ✅.",
+                 desc_de:"Anna Mathilda Gustafsson, *ca. 1848 Mjölby. Tochter von Gustaf Hindrik Gustafsson und Anna Brita Nilsdotter. Quelle: Nr. 4 im Linder-Ordner ✅."},
+  johannag:     {n:"Johanna Gustafsson",       b:"1852", s:"F",c:"sv", fi:"gustafh", mi:"annabn",
+                 desc:"Johanna Gustafsson, *ca 1852 Mjölby. Dotter till Gustaf Hindrik Gustafsson och Anna Brita Nilsdotter. Källa: Linder-pärmens Nr 4 ✅.",
+                 desc_de:"Johanna Gustafsson, *ca. 1852 Mjölby. Tochter von Gustaf Hindrik Gustafsson und Anna Brita Nilsdotter. Quelle: Nr. 4 im Linder-Ordner ✅."},
+  ottog:        {n:"Otto Gustafsson",          b:"1859", s:"M",c:"sv", fi:"gustafh", mi:"annabn",
+                 desc:"Otto Gustafsson, *ca 1859 Mjölby. Son till Gustaf Hindrik Gustafsson och Anna Brita Nilsdotter. Källa: Linder-pärmens Nr 4 ✅.",
+                 desc_de:"Otto Gustafsson, *ca. 1859 Mjölby. Sohn von Gustaf Hindrik Gustafsson und Anna Brita Nilsdotter. Quelle: Nr. 4 im Linder-Ordner ✅."},
+
+  // ── Anders Anderssons övriga barn (utöver augustl) ──
+  johannasofiaa:{n:"Johanna Sofia Andersson",  b:"1854", s:"F",c:"sv", fi:"andersandersson", mi:"heddasofia",
+                 desc:"Johanna Sofia Andersson, *1854 Mjölby. Dotter till Anders Andersson och Hedda Sofia Nilsdotter. Utflyttad 1883. ✅ HFL AI:29 sid.347.",
+                 desc_de:"Johanna Sofia Andersson, *1854 Mjölby. Tochter von Anders Andersson und Hedda Sofia Nilsdotter. Ausgezogen 1883. ✅ Quelle: HFL AI:29 S.347."},
+  andersgustafa:{n:"Anders Gustaf Andersson",  b:"1865", s:"M",c:"sv", fi:"andersandersson", mi:"heddasofia",
+                 desc:"Anders Gustaf Andersson, *1865 Mjölby. Son till Anders Andersson och Hedda Sofia Nilsdotter. ✅ HFL AI:29 sid.347.",
+                 desc_de:"Anders Gustaf Andersson, *1865 Mjölby. Sohn von Anders Andersson und Hedda Sofia Nilsdotter. ✅ Quelle: HFL AI:29 S.347."},
+  hildamariaa:  {n:"Hilda Maria Andersson",    b:"19.11.1868", s:"F",c:"sv", fi:"andersandersson", mi:"heddasofia",
+                 desc:"Hilda Maria Andersson, *19.11.1868 Mjölby. Dotter till Anders Andersson och Hedda Sofia Nilsdotter. ✅ Dopbok CI:4 bild 32 sid 51 rad 52 + HFL AI:29 sid.347.",
+                 desc_de:"Hilda Maria Andersson, *19.11.1868 Mjölby. Tochter von Anders Andersson und Hedda Sofia Nilsdotter. ✅ Taufbuch CI:4 Bild 32 + HFL AI:29 S.347."},
+  fransjohana:  {n:"Frans Johan Andersson",    b:"1871", s:"M",c:"sv", fi:"andersandersson", mi:"heddasofia",
+                 desc:"Frans Johan Andersson, *1871 Mjölby. Son till Anders Andersson och Hedda Sofia Nilsdotter. ✅ HFL AI:29 sid.347.",
+                 desc_de:"Frans Johan Andersson, *1871 Mjölby. Sohn von Anders Andersson und Hedda Sofia Nilsdotter. ✅ Quelle: HFL AI:29 S.347."},
+  augustaa:     {n:"Augusta Andersson",        b:null,   s:"F",c:"sv", fi:"andersandersson", mi:"heddasofia",
+                 desc:"Augusta Andersson, födelseår okänt. Dotter till Anders Andersson och Hedda Sofia Nilsdotter. 📷 Ateljeporträtt finns, fotograf Klara Rosendahl, Mjölby. Baksida: 'Augusta Andersson / August Linders syster'. ✅ Primärkälla.",
+                 desc_de:"Augusta Andersson, Geburtsjahr unbekannt. Tochter von Anders Andersson und Hedda Sofia Nilsdotter. 📷 Atelierporträt vorhanden, Fotograf Klara Rosendahl, Mjölby. Rückseite: 'Augusta Andersson / August Linders syster'. ✅ Primärquelle."},
+
+  // ── Nils Månssons övriga barn (utöver annabn) ──
+  lenakajsam:   {n:"Lena Kajsa Månsdotter",    b:"1803", s:"F",c:"sv", fi:"nilsmans", mi:"britahel",
+                 desc:"Lena Kajsa Månsdotter, *1803 Åsbo. Dotter till Nils Månsson och Brita Helena Larsdotter. Källa: Linder-pärmens Nr 10 ✅.",
+                 desc_de:"Lena Kajsa Månsdotter, *1803 Åsbo. Tochter von Nils Månsson und Brita Helena Larsdotter. Quelle: Nr. 10 im Linder-Ordner ✅."},
+  majalisam:    {n:"Maja Lisa Månsdotter",      b:"1806", s:"F",c:"sv", fi:"nilsmans", mi:"britahel",
+                 desc:"Maja Lisa Månsdotter, *1806 Åsbo. Dotter till Nils Månsson och Brita Helena Larsdotter. Källa: Linder-pärmens Nr 10 ✅.",
+                 desc_de:"Maja Lisa Månsdotter, *1806 Åsbo. Tochter von Nils Månsson und Brita Helena Larsdotter. Quelle: Nr. 10 im Linder-Ordner ✅."},
+  svenm:        {n:"Sven Månsson",              b:"1810", s:"M",c:"sv", fi:"nilsmans", mi:"britahel",
+                 desc:"Sven Månsson, *1810 Åsbo. Son till Nils Månsson och Brita Helena Larsdotter. Källa: Linder-pärmens Nr 10 ✅.",
+                 desc_de:"Sven Månsson, *1810 Åsbo. Sohn von Nils Månsson und Brita Helena Larsdotter. Quelle: Nr. 10 im Linder-Ordner ✅."},
+
+  // ── Alfred Bergmans övriga barn (utöver elsa) ──
+  hjalmarbg:    {n:"Hjalmar Werner Bergman",   b:"1887", s:"M",c:"svb", fi:"alfred", mi:"amanda",
+                 desc:"Hjalmar Werner Bergman, *1887 Lysekil. Son till Alfred Bergman och Amanda Strömberg. ✅ Riksarkivet folkräkningar.",
+                 desc_de:"Hjalmar Werner Bergman, *1887 Lysekil. Sohn von Alfred Bergman und Amanda Strömberg. ✅ Riksarkivet Volkszählungen."},
+  klarakbg:     {n:"Klara Konstantia Bergman", b:"1888", s:"F",c:"svb", fi:"alfred", mi:"amanda",
+                 desc:"Klara Konstantia Bergman, *1888 Brastad. Dotter till Alfred Bergman och Amanda Strömberg. ✅ Riksarkivet folkräkningar.",
+                 desc_de:"Klara Konstantia Bergman, *1888 Brastad. Tochter von Alfred Bergman und Amanda Strömberg. ✅ Riksarkivet Volkszählungen."},
+  arturbg:      {n:"Artur Bergman",            b:"1892", s:"M",c:"svb", fi:"alfred", mi:"amanda",
+                 desc:"Artur Bergman, *1892 Lyse. Son till Alfred Bergman och Amanda Strömberg. ✅ Riksarkivet folkräkningar.",
+                 desc_de:"Artur Bergman, *1892 Lyse. Sohn von Alfred Bergman und Amanda Strömberg. ✅ Riksarkivet Volkszählungen."},
+  gurlibg:      {n:"Gurli Alfhild Bergman",    b:"1894", s:"F",c:"svb", fi:"alfred", mi:"amanda",
+                 desc:"Gurli Alfhild Bergman, *1894 Lyse. Dotter till Alfred Bergman och Amanda Strömberg. ✅ Riksarkivet folkräkningar.",
+                 desc_de:"Gurli Alfhild Bergman, *1894 Lyse. Tochter von Alfred Bergman und Amanda Strömberg. ✅ Riksarkivet Volkszählungen."},
+  sixtenbg:     {n:"Sixten Folke Bergman",     b:"1896", s:"M",c:"svb", fi:"alfred", mi:"amanda",
+                 desc:"Sixten Folke Bergman, *1896 Lyse. Son till Alfred Bergman och Amanda Strömberg. ✅ Riksarkivet folkräkningar.",
+                 desc_de:"Sixten Folke Bergman, *1896 Lyse. Sohn von Alfred Bergman und Amanda Strömberg. ✅ Riksarkivet Volkszählungen."},
+  annajuditbg:  {n:"Anna Judit Bergman",       b:"1899", s:"F",c:"svb", fi:"alfred", mi:"amanda",
+                 desc:"Anna Judit Bergman, *1899 Lyse. Dotter till Alfred Bergman och Amanda Strömberg. ✅ Riksarkivet folkräkningar.",
+                 desc_de:"Anna Judit Bergman, *1899 Lyse. Tochter von Alfred Bergman und Amanda Strömberg. ✅ Riksarkivet Volkszählungen."},
+  brorsvenbg:   {n:"Bror Sven Bergman",        b:"1901", s:"M",c:"svb", fi:"alfred", mi:"amanda",
+                 desc:"Bror Sven Bergman, *1901 Lyse. Son till Alfred Bergman och Amanda Strömberg. ✅ Riksarkivet folkräkningar.",
+                 desc_de:"Bror Sven Bergman, *1901 Lyse. Sohn von Alfred Bergman und Amanda Strömberg. ✅ Riksarkivet Volkszählungen."},
+  erikabg:      {n:"Erik Alvar Bergman",       b:"1904", s:"M",c:"svb", fi:"alfred", mi:"amanda",
+                 desc:"Erik Alvar Bergman, *1904, plåttryckare. Son till Alfred Bergman och Amanda Strömberg. ✅ Riksarkivet folkräkningar.",
+                 desc_de:"Erik Alvar Bergman, *1904, Flaschner. Sohn von Alfred Bergman und Amanda Strömberg. ✅ Riksarkivet Volkszählungen."},
+  olofhbg:      {n:"Olof Hugo Bergman",        b:"1906", s:"M",c:"svb", fi:"alfred", mi:"amanda",
+                 desc:"Olof Hugo Bergman, *1906, svarvare. Son till Alfred Bergman och Amanda Strömberg. ✅ Riksarkivet folkräkningar.",
+                 desc_de:"Olof Hugo Bergman, *1906, Dreher. Sohn von Alfred Bergman und Amanda Strömberg. ✅ Riksarkivet Volkszählungen."},
+  arturosvbg:   {n:"Artur Osvald Bergman",     b:"1908", s:"M",c:"svb", fi:"alfred", mi:"amanda",
+                 desc:"Artur Osvald Bergman, *1908, smidesarbetare. Son till Alfred Bergman och Amanda Strömberg. ✅ Riksarkivet folkräkningar.",
+                 desc_de:"Artur Osvald Bergman, *1908, Schmied. Sohn von Alfred Bergman und Amanda Strömberg. ✅ Riksarkivet Volkszählungen."},
+  knutabg:      {n:"Knut Alfred Bergman",      b:"1910", s:"M",c:"svb", fi:"alfred", mi:"amanda",
+                 desc:"Knut Alfred Bergman, *1910. Son till Alfred Bergman och Amanda Strömberg. ✅ Riksarkivet folkräkningar.",
+                 desc_de:"Knut Alfred Bergman, *1910. Sohn von Alfred Bergman und Amanda Strömberg. ✅ Riksarkivet Volkszählungen."},
+};
+Object.keys(P).forEach(id => P[id].id = id);
+
+// ════ LAYOUT CONSTANTS ════
+const CARD_W  = 168;
+const COL_GAP = 40;
+const COL_W   = CARD_W + COL_GAP;
+const LEAF_H  = 46;   // px per leaf slot
+const MAX_G   = 9;    // max generations (öka vid behov)
+
+// ════ HELPERS ════
+// Extraherar ett sorterbart år ur b-fältet ("23.2.1865" → 1865, "ca 1841" → 1841, null → 9999)
+function birthYear(p) {
+  if (!p.b) return 9999;
+  const m = p.b.match(/\d{4}/);
+  return m ? parseInt(m[0], 10) : 9999;
 }
 
-// ── i18n apply ─────────────────────────────────────────────
-function t(k) { return T[lang][k] || T.sv[k] || k; }
+function getSibs(id) {
+  const p = P[id];
+  return Object.values(P).filter(o =>
+    o.id !== id &&
+    ((p.fi && o.fi === p.fi) || (p.mi && o.mi === p.mi))
+  ).sort((a, b) => birthYear(a) - birthYear(b));
+}
 
-function applyLang() {
-  document.documentElement.lang = lang;
-  document.title = t('title');
-  document.getElementById('h-title').textContent = t('title');
-  document.getElementById('h-sub').textContent   = t('sub');
-  document.getElementById('flag-sv').classList.toggle('active', lang === 'sv');
-  document.getElementById('flag-en').classList.toggle('active', lang === 'en');
-  document.getElementById('zoom-hint').textContent = t('zoomHint');
+function buildSlots(rootId) {
+  const slots = [[rootId]];
+  for (let g = 0; g < MAX_G - 1; g++) {
+    const next = [];
+    let any = false;
+    for (const id of slots[g]) {
+      const p = id ? P[id] : null;
+      const f = p ? p.fi || null : null;
+      const m = p ? p.mi || null : null;
+      next.push(f, m);
+      if (f || m) any = true;
+    }
+    if (!any) break;
+    slots.push(next);
+  }
+  return slots;
+}
 
-  T[lang].legs.forEach((s,i) => document.getElementById('leg'+i).textContent = s);
-  T[lang].gens.forEach((s,i) => document.getElementById('gl'+i).textContent  = s);
+function dateStr(p) {
+  const parts = [];
+  if (p.b) parts.push('*' + p.b);
+  if (p.d) parts.push('†' + p.d);
+  return parts.join('  ');
+}
 
-  const [et, es, ew, eg] = T[lang].ext;
-  document.getElementById('ext-title').textContent = et;
-  document.getElementById('ext-sub').textContent   = es;
-  document.getElementById('ext-wil').textContent   = ew;
-  document.getElementById('ext-gert').textContent  = eg;
+const COLORS = {
+  sv:'#5ab6e0', svb:'#52bb52', rs:'#e06060', de:'#d0b040', mix:'#9060d0', unk:'#bbb'
+};
 
-  // Update card date labels
-  Object.keys(P).forEach(pid => {
-    const el = document.getElementById('dt-' + pid);
-    if (el) el.textContent = P[pid][lang].dates;
+function getChildren(id) {
+  return Object.values(P).filter(o => o.fi === id || o.mi === id)
+               .sort((a, b) => birthYear(a) - birthYear(b));
+}
+
+function getSpouses(id) {
+  const children = getChildren(id);
+  const seen = new Set();
+  const result = [];
+  children.forEach(c => {
+    const other = (c.fi === id) ? c.mi : c.fi;
+    if (other && P[other] && !seen.has(other)) { seen.add(other); result.push(P[other]); }
   });
-
-  // Panel strings
-  document.getElementById('sibs-label').textContent     = t('siblings');
-  document.getElementById('edit-label').textContent     = t('edit');
-  document.getElementById('edit-save').textContent      = t('save');
-  document.getElementById('edit-cancel').textContent    = t('cancel');
-  document.getElementById('comments-title').textContent = t('comments');
-  document.getElementById('comment-input').placeholder  = t('addCmt');
-  document.getElementById('comment-submit').textContent = t('submit');
-
-  if (panelOpen && currentPid) renderPanel(currentPid);
-  renderAuthUI();
+  return result;
 }
 
-// ── Auth UI ────────────────────────────────────────────────
-function renderAuthUI() {
-  const area = document.getElementById('auth-area');
-  if (!auth) { area.innerHTML = ''; return; }
-  if (currentUser) {
-    area.innerHTML =
-      `<div id="user-label">` +
-      (currentUser.photoURL ? `<img id="user-avatar" src="${currentUser.photoURL}" alt="">` : '') +
-      `<span>${esc(currentUser.displayName || currentUser.email)}</span>` +
-      `<button id="auth-btn" onclick="doSignOut()">${t('logout')}</button>` +
-      `</div>`;
-  } else {
-    area.innerHTML = `<button id="auth-btn" onclick="doSignIn()">${t('login')}</button>`;
+// ════ DETAIL PANEL ════
+const detPanel   = document.getElementById('detail');
+const detBackdrop = document.getElementById('det-backdrop');
+
+function showDetailPanel() {
+  detPanel.classList.remove('collapsed');
+  detBackdrop.classList.add('visible');
+}
+function closeDetailPanel() {
+  detPanel.classList.add('collapsed');
+  detBackdrop.classList.remove('visible');
+}
+detBackdrop.addEventListener('click', closeDetailPanel);
+
+function renderDetail(id) {
+  showDetailPanel();
+  if (!id || !P[id]) { detPanel.innerHTML = `<div class="det-empty">${LANG[lang].detEmpty}</div>`; return; }
+  const p   = P[id];
+  const col = COLORS[p.c] || '#bbb';
+
+  function linkBtn(person) {
+    return `<button class="det-link" onclick="focusPerson('${person.id}')">${person.s==='F'?'♀':'♂'} ${person.n}${person.b?' <small style="color:#aaa">*'+person.b+'</small>':''}</button>`;
   }
-}
-function doSignIn()  { auth && auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }
-function doSignOut() { auth && auth.signOut(); }
-function isAdmin()   { return currentUser && currentUser.email === CONFIG.adminEmail; }
 
-// ── Panel ──────────────────────────────────────────────────
-const panel = document.getElementById('panel');
-
-function openPanel(pid) {
-  document.querySelectorAll('.card.active').forEach(c => c.classList.remove('active'));
-  document.getElementById(pid)?.classList.add('active');
-  currentPid = pid;
-  panelOpen  = true;
-  renderPanel(pid);
-  panel.classList.add('open');
-}
-
-function closePanel() {
-  panel.classList.remove('open');
-  document.querySelectorAll('.card.active').forEach(c => c.classList.remove('active'));
-  panelOpen  = false;
-  currentPid = null;
-}
-
-async function renderPanel(pid) {
-  const data = P[pid];
-  if (!data) return;
-  const d = data[lang] || data.sv;
-
-  // Avatar colour from card
-  const card = document.getElementById(pid);
-  const avBg = card ? getComputedStyle(card.querySelector('.av')).backgroundColor : '#999';
-  const avEl = document.getElementById('panel-av');
-  avEl.style.background = avBg;
-  avEl.textContent = card ? card.querySelector('.av').textContent : '👤';
-
-  document.getElementById('panel-name').textContent  = card?.querySelector('.nm')?.childNodes[0]?.textContent?.trim() || d.name || pid;
-  document.getElementById('panel-dates').textContent = d.dates;
-
-  // Bio (possibly overridden in Firebase)
-  let bio = d.bio;
-  if (db) {
-    try {
-      const snap = await db.collection('persons').doc(pid).get();
-      if (snap.exists) bio = (lang === 'en' ? snap.data().bioEn : snap.data().bioSv) || bio;
-    } catch(_) {}
+  function relItem(person) {
+    const sym = person.s === 'F' ? '♀' : '♂';
+    return `<span class="rel-item"><span class="rel-sex">${sym}</span><button class="det-link" onclick="focusPerson('${person.id}')">${person.n}${person.b?' <small style="color:#aaa">*'+person.b+'</small>':''}</button></span>`;
   }
-  document.getElementById('panel-bio').textContent = bio;
+
+  let html = '';
+
+  // Header
+  html += `<div class="det-head" style="background:${col}18; border-left:4px solid ${col}">
+    <div class="det-av" style="background:${col}">${p.s==='F'?'♀':'♂'}</div>
+    <div style="flex:1;min-width:0">
+      <div class="det-name">${p.n}</div>
+      <div class="det-dates">${p.b?'*'+p.b:''}${p.b&&p.d?'&ensp;':''}${p.d?'†'+p.d:''}</div>
+    </div>
+    <button id="det-close" title="Stäng">×</button>
+  </div>`;
+
+  html += '<div class="det-body">';
+
+  // Description
+  const t = LANG[lang];
+  const descText = p['desc_' + lang] || p.desc;
+  if (descText) {
+    html += `<div class="det-section"><div class="det-text">${descText}</div></div>`;
+  }
+
+  // Parents
+  const father = p.fi ? P[p.fi] : null;
+  const mother = p.mi ? P[p.mi] : null;
+  if (father || mother) {
+    html += `<div class="det-section"><h4>${t.detParents}</h4><div class="det-links">`;
+    if (father) html += linkBtn(father);
+    if (mother) html += linkBtn(mother);
+    html += '</div></div>';
+  }
+
+  // Spouses
+  const spouses = getSpouses(id);
+  if (spouses.length > 0) {
+    html += `<div class="det-section"><h4>${t.detSpouse}</h4><div class="det-links">`;
+    spouses.forEach(sp => { html += linkBtn(sp); });
+    html += '</div></div>';
+  }
+
+  // Children
+  const children = getChildren(id);
+  if (children.length > 0) {
+    html += `<div class="det-rels"><span class="rel-label">${t.detChildren}:</span><div class="rel-list">`;
+    children.forEach(c => { html += relItem(c); });
+    html += '</div></div>';
+  }
 
   // Siblings
-  const sibDiv = document.getElementById('panel-sibs');
-  if (d.sibs) {
-    sibDiv.style.display = '';
-    document.getElementById('sibs-label').textContent = t('siblings');
-    document.getElementById('sibs-text').textContent  = d.sibs;
-  } else {
-    sibDiv.style.display = 'none';
+  const sibs = getSibs(id);
+  if (sibs.length > 0) {
+    html += `<div class="det-rels"><span class="rel-label">${t.detSiblings}:</span><div class="rel-list">`;
+    sibs.forEach(s => { html += relItem(s); });
+    html += '</div></div>';
   }
 
-  // Edit (admin only)
-  const editBtn  = document.getElementById('edit-btn');
-  const editForm = document.getElementById('edit-form');
-  editBtn.style.display = isAdmin() ? 'inline-flex' : 'none';
-  editForm.style.display = 'none';
-  document.getElementById('edit-sv').value = data.sv.bio;
-  document.getElementById('edit-en').value = (data.en || data.sv).bio;
-  document.getElementById('edit-label').textContent  = t('edit');
-  document.getElementById('edit-save').textContent   = t('save');
-  document.getElementById('edit-cancel').textContent = t('cancel');
-
-  // Comments
-  document.getElementById('comments-title').textContent = t('comments');
-  await loadComments(pid);
-
-  const cf = document.getElementById('comment-form');
-  const lp = document.getElementById('login-prompt');
-  if (!db) { cf.style.display = 'none'; lp.style.display = 'none'; }
-  else if (currentUser) {
-    cf.style.display = 'flex'; lp.style.display = 'none';
-    document.getElementById('comment-input').placeholder  = t('addCmt');
-    document.getElementById('comment-submit').textContent = t('submit');
-  } else {
-    cf.style.display = 'none'; lp.style.display = '';
-    document.getElementById('login-prompt').textContent = t('loginCmt');
+  // Short note (x field)
+  if (p.x && !descText) {
+    html += `<div class="det-section"><h4>${t.detNote}</h4><div class="det-note">${p.x}</div></div>`;
   }
-}
 
-async function loadComments(pid) {
-  const list = document.getElementById('comments-list');
-  list.innerHTML = '';
-  if (!db) return;
-  try {
-    const snap = await db.collection('comments').doc(pid).collection('items').orderBy('timestamp').get();
-    if (snap.empty) {
-      list.innerHTML = `<p style="font-size:13px;color:#ccc;margin-bottom:10px">${t('noCmt')}</p>`;
-      return;
+  // Fotosektion
+  if (isAdmin) {
+    // ── Admin: hantera foton direkt i panelen ──
+    const items = PHOTOS[id] || [];
+    html += `<div class="det-section" id="det-photo-admin">
+      <h4>Foton</h4>
+      <div id="det-photo-list">`;
+    if (items.length === 0) {
+      html += `<div class="det-note" style="margin-bottom:6px">Inga foton kopplade ännu.</div>`;
+    } else {
+      items.forEach((item, idx) => {
+        const url   = typeof item === 'string' ? item : item.url;
+        const label = typeof item === 'string' ? `Foto ${idx + 1}` : (item.text || `Foto ${idx + 1}`);
+        html += `<div class="det-photo-row">
+          <a class="det-photo-lnk" href="${url}" target="_blank" rel="noopener">📷 ${label}</a>
+          <button class="det-photo-del" onclick="deleteAdminPhoto('${id}',${idx})" title="Ta bort">✕</button>
+        </div>`;
+      });
     }
-    snap.forEach(doc => {
-      const c = doc.data();
-      const time = c.timestamp ? new Date(c.timestamp.toMillis()).toLocaleDateString(lang === 'sv' ? 'sv-SE' : 'en-GB') : '';
-      const div = document.createElement('div');
-      div.className = 'comment';
-      div.innerHTML = `<div><span class="comment-author">${esc(c.author||'–')}</span><span class="comment-time">${time}</span></div><div class="comment-text">${esc(c.text)}</div>`;
-      list.appendChild(div);
-    });
-  } catch(e) { console.error(e); }
+    html += `</div>
+      <button class="det-link det-photo-add" onclick="showAddPhotoForm('${id}')">＋ Lägg till foto</button>
+    </div>`;
+  } else if (approved) {
+    html += `<div class="det-section"><button class="photos-link" onclick="openPhotoSearch('${id}')">📷 Se foton i Google Photos</button></div>`;
+  }
+
+  html += '</div>'; // det-body
+  detPanel.innerHTML = html;
+  document.getElementById('det-close').addEventListener('click', closeDetailPanel);
 }
 
-function esc(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+// ════ STATE ════
+const hist = [];
+let currentRoot = 'lasse';
+
+// ════ DOM REFS ════
+const viewport  = document.getElementById('viewport');
+const wrap      = document.getElementById('wrap');
+const cv        = document.getElementById('cv');
+const backBtn   = document.getElementById('back');
+const focusName = document.getElementById('focus-name');
+
+// ════ FOCUS ════
+function focusPerson(id) {
+  if (!P[id] || id === currentRoot) return;
+  hist.push(currentRoot);
+  currentRoot = id;
+  const doRender = () => { render(id); renderDetail(id); };
+  if (document.startViewTransition) {
+    wrap.querySelectorAll('.card[data-id]').forEach(c => {
+      c.style.viewTransitionName = 'pers-' + c.dataset.id;
+    });
+    document.startViewTransition(doRender);
+  } else {
+    doRender();
+  }
+  backBtn.disabled = false;
 }
 
-// ── Panel event wiring ─────────────────────────────────────
-document.getElementById('panel-close').onclick = closePanel;
+backBtn.addEventListener('click', () => {
+  if (!hist.length) return;
+  const prev = hist.pop();
+  currentRoot = prev;
+  render(prev);
+  renderDetail(prev);
+  backBtn.disabled = hist.length === 0;
+});
 
-document.getElementById('edit-btn').onclick = () => {
-  document.getElementById('edit-form').style.display = '';
-  document.getElementById('edit-btn').style.display  = 'none';
-};
-document.getElementById('edit-cancel').onclick = () => {
-  document.getElementById('edit-form').style.display = 'none';
-  if (isAdmin()) document.getElementById('edit-btn').style.display = 'inline-flex';
-};
-document.getElementById('edit-save').onclick = async () => {
-  if (!db || !isAdmin() || !currentPid) return;
-  const sv = document.getElementById('edit-sv').value.trim();
-  const en = document.getElementById('edit-en').value.trim();
-  try {
-    await db.collection('persons').doc(currentPid).set({ bioSv: sv, bioEn: en }, { merge: true });
-    P[currentPid].sv.bio = sv;
-    if (P[currentPid].en) P[currentPid].en.bio = en;
-    document.getElementById('panel-bio').textContent = lang === 'en' ? en : sv;
-    document.getElementById('edit-form').style.display = 'none';
-    document.getElementById('edit-btn').style.display  = 'inline-flex';
-  } catch(e) { alert('Fel: ' + e.message); }
-};
-document.getElementById('comment-submit').onclick = async () => {
-  if (!db || !currentUser || !currentPid) return;
-  const inp  = document.getElementById('comment-input');
-  const text = inp.value.trim();
-  if (!text) return;
-  try {
-    await db.collection('comments').doc(currentPid).collection('items').add({
-      text, author: currentUser.displayName || currentUser.email,
-      email: currentUser.email,
-      timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-    });
-    inp.value = '';
-    await loadComments(currentPid);
-  } catch(e) { alert('Fel: ' + e.message); }
-};
+function goHome() {
+  if (currentRoot === 'lasse' && !hist.length) return;
+  hist.length = 0;
+  currentRoot = 'lasse';
+  render('lasse');
+  renderDetail('lasse');
+  backBtn.disabled = true;
+}
 
-// ── Card clicks ────────────────────────────────────────────
-document.querySelectorAll('.card[data-p]').forEach(card => {
-  card.addEventListener('click', e => {
-    e.stopPropagation();
-    const pid = card.dataset.p;
-    if (panelOpen && currentPid === pid) closePanel();
-    else openPanel(pid);
+// ════ TOAST ════
+let toastTimer = null;
+function showToast(msg, ms = 3000) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), ms);
+}
+
+// ════ FOTO — laddas från Apps Script (Sheet) med fallback till photos.json ════
+let PHOTOS = {};
+
+async function loadPhotos() {
+  try {
+    const r = await fetch(`${APPS_SCRIPT_URL}?action=get_photos`);
+    const d = await r.json();
+    if (d && typeof d === 'object' && !d.error) { PHOTOS = d; return; }
+  } catch(e) {}
+  try {
+    const r = await fetch('photos.json');
+    PHOTOS = await r.json();
+  } catch(e) {}
+}
+loadPhotos();
+
+function openPhotoSearch(personId) {
+  const p     = P[personId];
+  const name  = p ? p.n : personId;
+  const items = PHOTOS[personId] || [];
+
+  if (!items.length) {
+    showToast(`Inga foton kopplade för ${name} ännu`);
+    return;
+  }
+
+  // En enda bild → öppna direkt
+  if (items.length === 1) {
+    const url = typeof items[0] === 'string' ? items[0] : items[0].url;
+    window.open(url, '_blank', 'noopener');
+    return;
+  }
+
+  // Flera bilder → visa modal
+  document.getElementById('photo-person-name').textContent = '📷 ' + name;
+  const list = document.getElementById('photo-list');
+  list.innerHTML = '';
+  items.forEach((item, i) => {
+    const url   = typeof item === 'string' ? item : item.url;
+    const label = typeof item === 'string' ? `Foto ${i + 1}` : (item.text || `Foto ${i + 1}`);
+    const a = document.createElement('a');
+    a.className = 'photo-item';
+    a.href      = url;
+    a.target    = '_blank';
+    a.rel       = 'noopener';
+    a.innerHTML = `<span class="photo-icon">📷</span>
+                   <span class="photo-label">${label}</span>
+                   <span class="photo-arrow">→</span>`;
+    list.appendChild(a);
   });
-});
-
-function setLang(l) { lang = l; applyLang(); }
-
-// ── Zoom / Pan ────────────────────────────────────────────
-const vp  = document.getElementById('vp');
-const pan = document.getElementById('pan');
-
-let scale = 0.72, tx = 0, ty = 0;
-let dragging = false, sx = 0, sy = 0, stx = 0, sty = 0;
-
-function applyXf() {
-  pan.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
+  document.getElementById('photo-modal').style.display = 'flex';
 }
 
-// Wheel = zoom centred on cursor
-vp.addEventListener('wheel', e => {
-  e.preventDefault();
-  const r  = vp.getBoundingClientRect();
-  const mx = e.clientX - r.left;
-  const my = e.clientY - r.top;
-  const prev = scale;
-  scale = Math.max(0.18, Math.min(3, scale * (e.deltaY < 0 ? 1.1 : 0.9)));
-  tx = mx - (mx - tx) * scale / prev;
-  ty = my - (my - ty) * scale / prev;
-  applyXf();
-}, { passive: false });
-
-// Drag = pan
-vp.addEventListener('mousedown', e => {
-  if (e.target.closest('.card') || e.target.closest('.zoom-controls')) return;
-  dragging = true; sx = e.clientX; sy = e.clientY; stx = tx; sty = ty;
-  vp.classList.add('dragging');
+function closePhotoModal() {
+  document.getElementById('photo-modal').style.display = 'none';
+}
+document.getElementById('photo-modal').addEventListener('click', function(e) {
+  if (e.target === this) closePhotoModal();
 });
-window.addEventListener('mousemove', e => {
-  if (!dragging) return;
-  tx = stx + (e.clientX - sx);
-  ty = sty + (e.clientY - sy);
-  applyXf();
-});
-window.addEventListener('mouseup', () => { dragging = false; vp.classList.remove('dragging'); });
 
-// Touch pan
-let tStartX, tStartY, tStx, tSty;
-vp.addEventListener('touchstart', e => {
-  if (e.touches.length === 1) {
-    tStartX = e.touches[0].clientX; tStartY = e.touches[0].clientY; tStx = tx; tSty = ty;
+// ════ ADMIN — fotolänkar per person ════
+function showAddPhotoForm(personId) {
+  const admin = document.getElementById('det-photo-admin');
+  if (!admin) return;
+  admin.querySelector('.det-photo-add').style.display = 'none';
+  const form = document.createElement('div');
+  form.id = 'add-photo-form';
+  form.style.marginTop = '8px';
+  form.innerHTML = `
+    <div class="apply-field" style="margin-bottom:7px">
+      <label>Foto-URL (klistra in från Google Photos)</label>
+      <input id="new-photo-url" type="url" placeholder="https://photos.google.com/photo/…">
+    </div>
+    <div class="apply-field" style="margin-bottom:8px">
+      <label>Bildtext (valfri)</label>
+      <input id="new-photo-text" type="text" placeholder="T.ex. Deportationshandling 1945">
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="det-link" style="background:#5ab6e0;color:#fff;border-color:#5ab6e0"
+              onclick="saveAdminPhoto('${personId}')">Spara</button>
+      <button class="det-link" onclick="renderDetail('${personId}')">Avbryt</button>
+    </div>
+    <div id="add-photo-status" style="font-size:11px;margin-top:6px;min-height:16px"></div>`;
+  admin.appendChild(form);
+  document.getElementById('new-photo-url').focus();
+}
+
+async function saveAdminPhoto(personId) {
+  const url    = (document.getElementById('new-photo-url').value || '').trim();
+  const text   = (document.getElementById('new-photo-text').value || '').trim();
+  const status = document.getElementById('add-photo-status');
+  if (!url) { status.textContent = 'Klistra in en URL.'; status.style.color = '#e06060'; return; }
+
+  status.textContent = 'Sparar…'; status.style.color = '#888';
+  try {
+    const r = await fetch(
+      `${APPS_SCRIPT_URL}?action=save_photo&personId=${encodeURIComponent(personId)}`
+      + `&url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`
+      + `&token=${encodeURIComponent(authToken)}`
+    );
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Okänt fel');
+    if (!PHOTOS[personId]) PHOTOS[personId] = [];
+    PHOTOS[personId].push(text ? {url, text} : url);
+    showToast(`📷 Foto sparat`);
+    renderDetail(personId);
+  } catch(e) {
+    status.textContent = `Fel: ${e.message}`; status.style.color = '#e06060';
+  }
+}
+
+async function deleteAdminPhoto(personId, idx) {
+  try {
+    const r = await fetch(
+      `${APPS_SCRIPT_URL}?action=delete_photo&personId=${encodeURIComponent(personId)}`
+      + `&idx=${idx}&token=${encodeURIComponent(authToken)}`
+    );
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'Okänt fel');
+    if (PHOTOS[personId]) PHOTOS[personId].splice(idx, 1);
+    showToast('Foto borttaget');
+    renderDetail(personId);
+  } catch(e) { showToast(`Fel: ${e.message}`); }
+}
+
+// ════ LINE DRAWING ════
+// S-kurva (bezier) per förälder i förälderns nationalitetsfärg.
+// Undviker de rätvinkelskorsningar som L-former skapar.
+// Skaftet (kort horisontellt segment vid barnet) ritas sist i faderns färg.
+function drawLines(ctx, slots, pos) {
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.lineWidth = 1.5;
+  ctx.lineCap  = 'round';
+  ctx.lineJoin = 'round';
+
+  for (let g = 1; g < slots.length; g++) {
+    for (let ci = 0; ci < slots[g - 1].length; ci++) {
+      const childId = slots[g - 1][ci];
+      if (!childId || !pos[childId]) continue;
+
+      const ch = pos[childId];
+      const cx = Math.round(ch.x + CARD_W) + 0.5;
+      const cy = Math.round(ch.y)          + 0.5;
+
+      // Mor ritas först, far sist (far syns överst vid eventuell överlappning).
+      [slots[g][ci * 2 + 1], slots[g][ci * 2]].forEach(pId => {
+        if (!pId || !pos[pId]) return;
+        const px  = Math.round(pos[pId].x) + 0.5;
+        const py  = Math.round(pos[pId].y) + 0.5;
+        const midX = (cx + px) / 2;
+
+        ctx.strokeStyle = COLORS[P[pId].c] || '#aaa';
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.bezierCurveTo(midX, cy, midX, py, px, py);
+        ctx.stroke();
+      });
+
+    }
+  }
+}
+
+// ════ RENDER ════
+function render(rootId) {
+  const slots  = buildSlots(rootId);
+  const numG   = slots.length;
+  // Use actual populated entries across all generations, not theoretical 2^n
+  const maxPop = Math.max(...slots.map(g => g.filter(id => id !== null).length));
+  const totalH = Math.max(maxPop * LEAF_H, 300);
+  const totalW = numG * COL_W + 40;
+  const PAD_X  = 20;
+  const PAD_Y  = 60;
+
+  // Resize canvas and wrap
+  const canvasH = totalH + PAD_Y * 2;
+  wrap.style.width  = totalW + 'px';
+  wrap.style.height = canvasH + 'px';
+  cv.width  = totalW;
+  cv.height = canvasH;
+
+  // Clear old cards (keep canvas)
+  wrap.querySelectorAll('.card, .gen-lbl').forEach(el => el.remove());
+
+  // Compute positions
+  const pos = {};
+  slots.forEach((gen, g) => {
+    const numSlots = gen.length;
+    const slotH = totalH / numSlots;
+    gen.forEach((id, i) => {
+      if (!id) return;
+      pos[id] = {
+        x: PAD_X + g * COL_W,
+        y: PAD_Y + (i + 0.5) * slotH,
+      };
+    });
+  });
+
+  // Gen labels
+  const GEN_LABELS = LANG[lang].genLabels;
+  slots.forEach((gen, g) => {
+    const lbl = document.createElement('div');
+    lbl.className = 'gen-lbl';
+    lbl.textContent = GEN_LABELS[g] || `Gen ${g}`;
+    lbl.style.left = (PAD_X + g * COL_W) + 'px';
+    wrap.appendChild(lbl);
+  });
+
+  // Render cards
+  slots.forEach((gen, g) => {
+    gen.forEach((id) => {
+      if (!id) return;
+      const p   = P[id];
+      const pos_p = pos[id];
+      const sibs = getSibs(id);
+      const isFocus = (id === rootId);
+
+      const card = document.createElement('div');
+      card.className = 'card c-' + p.c + (isFocus ? ' focused' : '');
+      card.dataset.id = id;
+      card.style.left = pos_p.x + 'px';
+      card.style.top  = pos_p.y + 'px';
+
+      // Top row: avatar + info
+      const cardTop = document.createElement('div');
+      cardTop.className = 'card-top';
+      const av = document.createElement('div');
+      av.className = 'av';
+      av.textContent = p.s === 'F' ? '♀' : '♂';
+      cardTop.appendChild(av);
+
+      // Info block
+      const info = document.createElement('div');
+      info.className = 'info';
+
+      const nm = document.createElement('div');
+      nm.className = 'nm';
+      nm.textContent = p.n;
+      info.appendChild(nm);
+
+      const dt = document.createElement('div');
+      dt.className = 'dt';
+      dt.textContent = dateStr(p);
+      if (p.x) {
+        const nt = document.createElement('span');
+        nt.className = 'note';
+        nt.textContent = ' · ' + p.x;
+        dt.appendChild(nt);
+      }
+      info.appendChild(dt);
+
+      // Sibling chips
+      let sibsDiv = null;
+      if (sibs.length > 0) {
+        sibsDiv = document.createElement('div');
+        sibsDiv.className = 'sibs';
+        const sibsLbl = document.createElement('span');
+        sibsLbl.className = 'section-lbl';
+        sibsLbl.textContent = lang === 'de' ? 'Geschwister:' : 'syskon:';
+        sibsDiv.appendChild(sibsLbl);
+        const sibsChips = document.createElement('div');
+        sibsChips.className = 'chips';
+        sibs.forEach(s => {
+          const btn = document.createElement('button');
+          btn.className = 'sib sib-' + s.c;
+          const shortName = s.n.split(' ')[0];
+          const yr = s.b ? s.b.replace('~','').replace('ca ','') : '';
+          btn.textContent = shortName + (yr ? ' ' + yr : '') + (s.d ? ' †' : '');
+          btn.title = s.n + (s.b ? ' *'+s.b : '') + (s.d ? ' †'+s.d : '');
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            focusPerson(s.id);
+          });
+          sibsChips.appendChild(btn);
+        });
+        sibsDiv.appendChild(sibsChips);
+      }
+
+      // Children chips
+      const children = getChildren(id);
+      let barnDiv = null;
+      if (children.length > 0) {
+        barnDiv = document.createElement('div');
+        barnDiv.className = 'barn';
+        const barnLbl = document.createElement('span');
+        barnLbl.className = 'section-lbl';
+        barnLbl.textContent = lang === 'de' ? 'Kinder:' : 'barn:';
+        barnDiv.appendChild(barnLbl);
+        const barnChips = document.createElement('div');
+        barnChips.className = 'chips';
+        children.forEach(c => {
+          const btn = document.createElement('button');
+          btn.className = 'child child-' + c.c;
+          const firstName = c.n.split(' ')[0];
+          const yr = c.b ? ' ' + c.b.replace('~','').replace('ca ','').substring(0,4) : '';
+          btn.textContent = firstName + yr + (c.d ? ' †' : '');
+          btn.title = c.n + (c.b ? ' *'+c.b : '') + (c.d ? ' †'+c.d : '');
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            focusPerson(c.id);
+          });
+          barnChips.appendChild(btn);
+        });
+        barnDiv.appendChild(barnChips);
+      }
+
+      cardTop.appendChild(info);
+      card.appendChild(cardTop);
+      if (sibs.length > 0) card.appendChild(sibsDiv);
+      if (barnDiv) card.appendChild(barnDiv);
+
+      // Click on card itself = focus, or re-open panel if already focused
+      if (!isFocus) {
+        card.addEventListener('click', () => focusPerson(id));
+      } else {
+        card.addEventListener('click', () => {
+          renderDetail(id);
+        });
+      }
+
+      // Fotoikon på kort (för godkända)
+      if (approved) {
+        const dot = document.createElement('button');
+        dot.className = 'photo-dot';
+        dot.textContent = '📷';
+        dot.title = 'Se foton i Google Photos';
+        dot.style.cssText = 'background:none;border:none;cursor:pointer;padding:0;';
+        dot.addEventListener('click', e => { e.stopPropagation(); openPhotoSearch(id); });
+        card.appendChild(dot);
+      }
+
+      wrap.appendChild(card);
+    });
+  });
+
+  // Initial line draw
+  const ctx = cv.getContext('2d');
+  drawLines(ctx, slots, pos);
+
+  // Two-pass layout: measure actual card heights, fix overlaps, re-centre parents
+  requestAnimationFrame(() => {
+    const GAP = 2;
+
+    // Pass 1→0: from deepest generation inward.
+    // For each generation: recalculate y as midpoint of children (except deepest),
+    // then push cards down to eliminate overlaps.
+    for (let g = slots.length - 1; g >= 0; g--) {
+      // Reposition to midpoint of children (skip deepest level)
+      if (g < slots.length - 1) {
+        slots[g].forEach((id, i) => {
+          if (!id) return;
+          const fId = slots[g + 1][i * 2];
+          const mId = slots[g + 1][i * 2 + 1];
+          const fY = (fId && pos[fId]) ? pos[fId].y : null;
+          const mY = (mId && pos[mId]) ? pos[mId].y : null;
+          if      (fY !== null && mY !== null) pos[id].y = (fY + mY) / 2;
+          else if (fY !== null)                pos[id].y = fY;
+          else if (mY !== null)                pos[id].y = mY;
+        });
+      }
+      // Fix overlaps top→bottom within this column.
+      // Extra FAMILY_SEP gap between different families (varje par far+mor = en familj).
+      const FAMILY_SEP_SAME  = 4;    // minimal gap — linjer hålls isär av staggerade bx
+      const FAMILY_SEP_DIFF  = 12;   // lite mer luft vid nationsskifte
+      let prevBot = -Infinity;
+      let prevFamilyGroup = -1;
+      let prevColor = '';
+      slots[g].forEach((id, j) => {
+        if (!id || !pos[id]) return;
+        const card = wrap.querySelector(`.card[data-id="${id}"]`);
+        if (!card) return;
+        const h = card.offsetHeight;
+        const familyGroup = Math.floor(j / 2);
+        const curColor = P[id]?.c || '';
+        const colorChanged = prevColor && curColor && prevColor !== curColor;
+        const sep = colorChanged ? FAMILY_SEP_DIFF : FAMILY_SEP_SAME;
+        const extraGap = (familyGroup > prevFamilyGroup && prevFamilyGroup >= 0) ? sep : 0;
+        const minY = prevBot + GAP + extraGap + h / 2;
+        if (pos[id].y < minY) pos[id].y = minY;
+        card.style.top = pos[id].y + 'px';
+        prevBot = pos[id].y + h / 2;
+        prevFamilyGroup = familyGroup;
+        prevColor = curColor;
+      });
+    }
+
+    // Pass 2: center each family pair on its linked child (both up AND down).
+    // Processes youngest→oldest, top→bottom within each column.
+    // Pairs are shifted as a unit; only constraint is "don't go above previous pair".
+    for (let g = 1; g < slots.length; g++) {
+      let prevBot = -Infinity;
+      const nSlots = slots[g].length;
+      for (let k = 0; k * 2 < nSlots; k++) {
+        const fId = slots[g][2*k]   || null;
+        const mId = slots[g][2*k+1] || null;
+        if (!fId && !mId) continue;
+
+        const childId = (slots[g-1] && k < slots[g-1].length) ? slots[g-1][k] : null;
+        const fCard = fId ? wrap.querySelector(`.card[data-id="${fId}"]`) : null;
+        const mCard = mId ? wrap.querySelector(`.card[data-id="${mId}"]`) : null;
+        const fH = fCard ? fCard.offsetHeight : 0;
+        const mH = mCard ? mCard.offsetHeight : 0;
+        const fCur = (fId && pos[fId]) ? pos[fId].y : null;
+        const mCur = (mId && pos[mId]) ? pos[mId].y : null;
+
+        const pairMid = fCur !== null && mCur !== null ? (fCur + mCur) / 2
+                      : fCur !== null ? fCur : mCur;
+        if (pairMid === null) continue;
+
+        const childY = (childId && pos[childId]) ? pos[childId].y : pairMid;
+        let shift = childY - pairMid; // positive = down, negative = up
+
+        // Clamp: topmost card in pair can't go above the previous pair's bottom
+        const topCur = fCur ?? mCur;
+        const topH   = fCur !== null ? fH : mH;
+        const topMin = prevBot + GAP + topH / 2;
+        if (topCur + shift < topMin) shift = topMin - topCur;
+
+        if (Math.abs(shift) > 0.5) {
+          if (fId && fCard && fCur !== null) { pos[fId].y += shift; fCard.style.top = pos[fId].y + 'px'; }
+          if (mId && mCard && mCur !== null) { pos[mId].y += shift; mCard.style.top = pos[mId].y + 'px'; }
+        }
+
+        if      (mId && pos[mId]) prevBot = pos[mId].y + mH / 2;
+        else if (fId && pos[fId]) prevBot = pos[fId].y + fH / 2;
+      }
+    }
+
+    // Expand canvas/wrap if cards were pushed below the original bounds
+    let maxBot = 0;
+    wrap.querySelectorAll('.card').forEach(c => {
+      const b = parseFloat(c.style.top) + c.offsetHeight / 2;
+      if (b > maxBot) maxBot = b;
+    });
+    const needed = maxBot + PAD_Y;
+    if (needed > cv.height) {
+      cv.height = needed;
+      wrap.style.height = needed + 'px';
+    }
+
+    // Redraw lines with corrected positions
+    drawLines(ctx, slots, pos);
+
+    // Auto-fit on first load: zoom out so all generations are visible
+    if (hist.length === 0) {
+      const vp = document.getElementById('viewport');
+      const contentW = parseFloat(wrap.style.width)  || cv.width;
+      const contentH = parseFloat(wrap.style.height) || cv.height;
+      const fitZoom = Math.min(
+        (vp.clientWidth  - 20) / contentW,
+        (vp.clientHeight - 20) / contentH,
+        1.0   // never zoom in on first load, only out
+      );
+      zoom = Math.max(0.3, fitZoom);
+    }
+    applyZoom();
+  });
+
+  // Update header
+  focusName.textContent = P[rootId] ? P[rootId].n : '';
+}
+
+// ════ ZOOM ════
+let zoom = 1;
+const zoomLayer = document.getElementById('zoom-layer');
+
+function applyZoom() {
+  wrap.style.transform = `scale(${zoom})`;
+  wrap.style.transformOrigin = 'top left';
+  const w = parseFloat(wrap.style.width)  || 0;
+  const h = parseFloat(wrap.style.height) || 0;
+  zoomLayer.style.width  = (w * zoom) + 'px';
+  zoomLayer.style.height = (h * zoom) + 'px';
+}
+
+document.getElementById('zoom-in').addEventListener('click', () => {
+  zoom = Math.min(2.2, zoom + 0.15); applyZoom();
+});
+document.getElementById('zoom-out').addEventListener('click', () => {
+  zoom = Math.max(0.3, zoom - 0.15); applyZoom();
+});
+
+// Pinch-to-zoom (centrerat på klämpunkten)
+let pinchDist0 = null, zoom0 = 1;
+let pinchCx = 0, pinchCy = 0;   // klämpunktens mittpunkt relativt viewport-elementet
+let scrollX0 = 0, scrollY0 = 0; // scroll vid gesturens start
+
+viewport.addEventListener('touchstart', e => {
+  if (e.touches.length === 2) {
+    const t0 = e.touches[0], t1 = e.touches[1];
+    pinchDist0 = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
+    zoom0 = zoom;
+    // Klämpunktens mittpunkt i viewport-koordinater
+    const rect = viewport.getBoundingClientRect();
+    pinchCx = ((t0.clientX + t1.clientX) / 2) - rect.left;
+    pinchCy = ((t0.clientY + t1.clientY) / 2) - rect.top;
+    // Spara scroll vid start
+    scrollX0 = viewport.scrollLeft;
+    scrollY0 = viewport.scrollTop;
   }
 }, { passive: true });
-vp.addEventListener('touchmove', e => {
-  if (e.touches.length === 1) {
+
+viewport.addEventListener('touchmove', e => {
+  if (e.touches.length === 2 && pinchDist0) {
+    const t0 = e.touches[0], t1 = e.touches[1];
+    const d = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
+    zoom = Math.max(0.3, Math.min(2.2, zoom0 * (d / pinchDist0)));
+
+    // Innehållspunkten som låg under klämpunktens mitt vid gesturtstart
+    const contentX = (scrollX0 + pinchCx) / zoom0;
+    const contentY = (scrollY0 + pinchCy) / zoom0;
+
+    applyZoom();
+
+    // Rulla så att samma innehållspunkt hamnar kvar under klämpunkten
+    viewport.scrollLeft = contentX * zoom - pinchCx;
+    viewport.scrollTop  = contentY * zoom - pinchCy;
+
     e.preventDefault();
-    tx = tStx + (e.touches[0].clientX - tStartX);
-    ty = tSty + (e.touches[0].clientY - tStartY);
-    applyXf();
   }
 }, { passive: false });
+viewport.addEventListener('touchend', () => { pinchDist0 = null; });
 
-// Zoom buttons
-function zoomAt(factor) {
-  const mx = vp.offsetWidth / 2, my = vp.offsetHeight / 2;
-  const prev = scale;
-  scale = Math.max(0.18, Math.min(3, scale * factor));
-  tx = mx - (mx - tx) * scale / prev;
-  ty = my - (my - ty) * scale / prev;
-  applyXf();
+// ════ LANGUAGE ════
+function setLang(l) {
+  lang = l;
+  document.body.className = 'lang-' + l;
+  document.querySelectorAll('.lang-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.lang === l)
+  );
+  document.querySelector('#topbar h1').textContent = LANG[l].title;
+  document.getElementById('back').textContent = LANG[l].back;
+  document.querySelector('.hint').textContent = LANG[l].hint;
+  document.getElementById('auth-open-btn').textContent = '📷 ' + LANG[l].bildarkiv;
+
+  // ── Modal ──
+  const L = LANG[l];
+  const $ = id => document.getElementById(id);
+  document.querySelector('#apply-view-request h2').textContent      = L.modalTitle;
+  document.querySelector('#apply-view-request > p').textContent     = L.modalIntro;
+  const lbls = document.querySelectorAll('#apply-view-request .apply-field label');
+  if (lbls[0]) lbls[0].textContent = L.labelName;
+  if (lbls[1]) lbls[1].textContent = L.labelEmail;
+  if (lbls[2]) lbls[2].textContent = L.labelRelation;
+  $('apply-name').placeholder     = L.phName;
+  $('apply-relation').placeholder = L.phRelation;
+  $('apply-submit').textContent   = L.btnApply;
+  $('apply-cancel').textContent   = L.btnCancel;
+  $('apply-cancel2').textContent  = L.btnCancel;
+  $('apply-cancel3').textContent  = L.btnClose;
+  document.querySelector('#apply-view-signin h2').textContent = L.signinTitle;
+  document.querySelector('#apply-view-signin > p').textContent = L.signinText;
+  document.querySelector('#apply-view-pending h2').textContent = L.pendingTitle;
+  document.querySelector('#apply-view-pending p').innerHTML =
+    L.pendingText + '<br><br><small id="apply-pending-note" style="color:#bbb"></small>';
+
+  render(currentRoot);
+  renderDetail(currentRoot);
 }
-document.getElementById('zin').onclick    = () => zoomAt(1.2);
-document.getElementById('zout').onclick   = () => zoomAt(1/1.2);
-document.getElementById('zreset').onclick = () => { scale = 0.72; tx = 0; ty = 0; applyXf(); };
+document.querySelectorAll('.lang-btn').forEach(btn =>
+  btn.addEventListener('click', () => setLang(btn.dataset.lang))
+);
 
-// ── SVG lines (drawn at identity, then initial zoom applied) ──
-const chart = document.getElementById('chart');
-const svg   = document.getElementById('lines');
+// ════════════════════════════════════════════════════════
+// BILDARKIV — KONFIGURATION
+// Fyll i dessa tre värden efter Google Cloud-setup.
+// Se docs/google-setup.md för steg-för-steg-instruktioner.
+// ════════════════════════════════════════════════════════
+const GOOG_CLIENT_ID  = '954461686218-bh0238cc4ddd2eld8ju6dqb5350qaomp.apps.googleusercontent.com';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwgRXCv0_UmjFfLb8mVb4fH_Ei_ikcD5sWXUIza82SiZM8oTZkBNnXeTCiradJkdozcHQ/exec';
 
-function cx(id) {
-  const el = document.getElementById(id);
-  const cr = chart.getBoundingClientRect();
-  const er = el.getBoundingClientRect();
-  return { rx: er.right-cr.left, lx: er.left-cr.left, cy: er.top-cr.top+er.height/2 };
+// ════ AUTH STATE ════
+let authUser  = null;  // { email, name, picture }
+let authToken = null;  // Google ID-token (för API-anrop)
+let approved  = false;
+let isAdmin   = false;
+let gsiReady  = false;
+const LASSE_EMAIL_CLIENT = 'lausse@gmail.com';
+
+// ════ JWT-PARSER (clientside, ingen server behövs) ════
+function parseJwt(token) {
+  try {
+    const b64 = token.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+    return JSON.parse(atob(b64));
+  } catch(e) { return null; }
 }
-function mkPath(d, color) {
-  const p = document.createElementNS('http://www.w3.org/2000/svg','path');
-  p.setAttribute('d', d); p.setAttribute('stroke', color);
-  p.setAttribute('stroke-width', '2'); p.setAttribute('fill','none');
-  p.setAttribute('stroke-linecap','round');
-  return p;
+
+// ════ GOOGLE SIGN-IN CALLBACK ════
+// Kallas av GIS när användaren loggat in med Google.
+window.handleCredentialResponse = async function(response) {
+  const jwt = parseJwt(response.credential);
+  if (!jwt) return;
+
+  authToken = response.credential;
+  authUser = {
+    email:   jwt.email,
+    name:    jwt.given_name || jwt.name.split(' ')[0],
+    picture: jwt.picture || ''
+  };
+
+  // Uppdatera UI: visa user-chip
+  document.getElementById('user-name').textContent = authUser.name;
+  if (authUser.picture) document.getElementById('user-pic').src = authUser.picture;
+  document.getElementById('user-chip').style.display = 'flex';
+  document.getElementById('auth-open-btn').style.display = 'none';
+
+  // Kontrollera godkännandestatus mot Apps Script
+  try {
+    const r = await fetch(
+      `${APPS_SCRIPT_URL}?action=check&token=${encodeURIComponent(response.credential)}`
+    );
+    const d = await r.json();
+    approved = d.approved === true;
+  } catch(e) { approved = false; }
+
+  if (approved) {
+    isAdmin = authUser.email.toLowerCase() === LASSE_EMAIL_CLIENT;
+    closeApplyModal();
+    renderPhotoIndicators();
+    renderDetail(currentRoot);
+    if (isAdmin)
+      document.getElementById('admin-btn').style.display = '';
+  } else {
+    // Inloggad men ej godkänd: visa ansökningsformuläret (med namn förifyllt från Google)
+    const nameEl = document.getElementById('apply-name');
+    if (nameEl) nameEl.value = authUser.name || '';
+    document.getElementById('apply-email').value = authUser.email || '';
+    // Öppna modal om den inte redan är öppen
+    document.getElementById('apply-modal').style.display = 'flex';
+    showApplyView('request');
+  }
+};
+
+// ════ UTLOGGNING ════
+function signOut() {
+  if (typeof google !== 'undefined') google.accounts.id.disableAutoSelect();
+  authUser  = null;
+  authToken = null;
+  approved  = false;
+  isAdmin   = false;
+  document.getElementById('user-chip').style.display = 'none';
+  document.getElementById('auth-open-btn').style.display = '';
+  document.getElementById('admin-btn').style.display = 'none';
+  document.querySelectorAll('.photo-dot').forEach(d => d.remove());
+  closeAdminPanel();
+  renderDetail(currentRoot);
 }
-function connect(a, b, color) {
-  const A = cx(a), B = cx(b), mx = Math.round((A.rx + B.lx) / 2);
-  svg.appendChild(mkPath(
-    `M ${Math.round(A.rx)} ${Math.round(A.cy)} H ${mx} V ${Math.round(B.cy)} H ${Math.round(B.lx)}`,
-    color
-  ));
+
+// ════ ADMIN-PANEL ════
+async function openAdminPanel() {
+  document.getElementById('admin-modal').style.display = 'flex';
+  document.getElementById('admin-body').innerHTML = '<div class="admin-empty">Laddar…</div>';
+  try {
+    const r = await fetch(`${APPS_SCRIPT_URL}?action=list&token=${encodeURIComponent(authToken)}`);
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'fel');
+    renderAdminRows(d.rows);
+  } catch(e) {
+    document.getElementById('admin-body').innerHTML =
+      `<div class="admin-empty">Kunde inte hämta listan: ${escHtml(e.message)}</div>`;
+  }
 }
-const C = { sv:'#4aa8d0', svb:'#42aa42', rs:'#cc4444', de:'#bb9020', mix:'#8050c8' };
 
-// Draw lines BEFORE applying initial transform (so coords are in native CSS space)
-requestAnimationFrame(() => requestAnimationFrame(() => {
-  const sanna = cx('sanna'), lasse = cx('lasse'), matti = cx('matti');
-  const sibX = Math.round(sanna.rx);
-  const sibMid = Math.round((sanna.cy + matti.cy) / 2);
-  svg.appendChild(mkPath(`M ${sibX} ${Math.round(sanna.cy)} V ${Math.round(matti.cy)}`, C.mix));
-  const leif = cx('leif'), mar = cx('marijana');
-  const ml = Math.round((sibX + leif.lx) / 2), mm = Math.round((sibX + mar.lx) / 2);
-  svg.appendChild(mkPath(`M ${sibX} ${sibMid} H ${ml} V ${Math.round(leif.cy)} H ${Math.round(leif.lx)}`, C.sv));
-  svg.appendChild(mkPath(`M ${sibX} ${sibMid} H ${mm} V ${Math.round(mar.cy)}  H ${Math.round(mar.lx)}`,  C.rs));
+function closeAdminPanel() {
+  document.getElementById('admin-modal').style.display = 'none';
+}
 
-  connect('leif','tage',C.sv); connect('leif','lilian',C.svb);
-  connect('marijana','ceda',C.rs); connect('marijana','kathe',C.de);
-  connect('tage','kalle',C.sv); connect('tage','alma',C.sv);
-  connect('lilian','alfred',C.svb); connect('lilian','amanda',C.svb);
-  connect('ceda','petar',C.rs); connect('ceda','stanija',C.rs);
-  connect('kathe','willibald',C.de); connect('kathe','trudis',C.de);
-  connect('stanija','jovanovic',C.rs);
-  connect('willibald','hermann',C.de); connect('willibald','paula',C.de);
-  connect('trudis','josefb',C.de); connect('trudis','mkcordes',C.de);
+function renderAdminRows(rows) {
+  if (!rows || !rows.length) {
+    document.getElementById('admin-body').innerHTML =
+      '<div class="admin-empty">Inga ansökningar ännu.</div>';
+    return;
+  }
+  const order = { 'VÄNTAR': 0, 'GODKÄND': 1, 'NEKAD': 2 };
+  rows.sort((a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3));
 
-  // Apply initial zoom after lines are drawn
-  applyXf();
-}));
+  const html = rows.map(row => {
+    const badgeCls = row.status === 'GODKÄND' ? 'badge-ok'
+                   : row.status === 'NEKAD'   ? 'badge-no' : 'badge-wait';
+    const right = row.status === 'VÄNTAR'
+      ? `<button class="adm-ok" onclick="adminAction('approve','${escHtml(row.email)}')">✓ Godkänn</button>
+         <button class="adm-no" onclick="adminAction('deny','${escHtml(row.email)}')">✗ Neka</button>`
+      : `<span class="badge ${badgeCls}">${escHtml(row.status)}</span>`;
+    return `<div class="admin-row">
+      <div>
+        <div class="admin-name">${escHtml(row.name)}</div>
+        <div class="admin-email">${escHtml(row.email)}</div>
+        <div class="admin-email" style="margin-top:1px;color:#ccc">${escHtml(row.ts)}</div>
+      </div>
+      <div class="admin-relation">${escHtml(row.relation)}</div>
+      <div class="admin-right">${right}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('admin-body').innerHTML = html;
+}
 
-// ── Boot ──────────────────────────────────────────────────
-applyLang();
-renderAuthUI();
+function escHtml(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+async function adminAction(type, email) {
+  const action = type === 'approve' ? 'admin_approve' : 'admin_deny';
+  try {
+    const r = await fetch(
+      `${APPS_SCRIPT_URL}?action=${action}&applyEmail=${encodeURIComponent(email)}&token=${encodeURIComponent(authToken)}`
+    );
+    const d = await r.json();
+    if (!d.ok) throw new Error(d.error || 'fel');
+    if (type === 'approve') showToast('✓ Godkänd — välkomstmail skickat');
+    else showToast('✗ Ansökan nekad');
+    openAdminPanel(); // ladda om listan
+  } catch(e) {
+    showToast(`Fel: ${escHtml(e.message)}`);
+  }
+}
+
+// Stäng admin-panel vid klick utanför
+document.getElementById('admin-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeAdminPanel();
+});
+
+// ════ VISA FOTOIKONER PÅ KORTEN ════
+function renderPhotoIndicators() {
+  document.querySelectorAll('.card[data-id]').forEach(card => {
+    if (card.querySelector('.photo-dot')) return;
+    const id = card.dataset.id;
+    const dot = document.createElement('button');
+    dot.className = 'photo-dot';
+    dot.textContent = '📷';
+    dot.title = 'Se foton i Google Photos';
+    dot.style.cssText = 'background:none;border:none;cursor:pointer;padding:0;';
+    dot.addEventListener('click', e => { e.stopPropagation(); openPhotoSearch(id); });
+    card.appendChild(dot);
+  });
+}
+
+// ════ ANSÖKNINGSMODAL ════
+function openApplyModal() {
+  document.getElementById('apply-modal').style.display = 'flex';
+  if (authUser && approved) {
+    closeApplyModal(); // redan inloggad och godkänd — ska ej hända
+  } else if (authUser && !approved) {
+    // Inloggad men ej godkänd: hoppa direkt till ansökningsformuläret
+    document.getElementById('apply-name').value = authUser.name || '';
+    document.getElementById('apply-email').value = authUser.email || '';
+    showApplyView('request');
+  } else {
+    // Ej inloggad: visa Google-knappen
+    showApplyView('signin');
+  }
+}
+
+function closeApplyModal() {
+  document.getElementById('apply-modal').style.display = 'none';
+}
+
+function showApplyView(v) {
+  ['request','signin','pending'].forEach(n => {
+    document.getElementById('apply-view-' + n).style.display = (n === v ? '' : 'none');
+  });
+}
+
+// Initierar GIS med auto_select — körs en gång vid sidladdning
+function initGSI() {
+  if (gsiReady || typeof google === 'undefined') return;
+  google.accounts.id.initialize({
+    client_id: GOOG_CLIENT_ID,
+    callback:  handleCredentialResponse,
+    auto_select: true,          // loggar in automatiskt om session finns
+    use_fedcm_for_prompt: false
+  });
+  google.accounts.id.renderButton(
+    document.getElementById('gsi-btn-container'),
+    { theme: 'outline', size: 'large', width: 260, text: 'signin_with' }
+  );
+  google.accounts.id.prompt(); // One Tap-popup för återvändande användare
+  gsiReady = true;
+}
+
+// ════ SKICKA ANSÖKAN ════
+async function submitApplication() {
+  const name     = document.getElementById('apply-name').value.trim();
+  const email    = (authUser && authUser.email) || document.getElementById('apply-email').value.trim();
+  const relation = document.getElementById('apply-relation').value.trim();
+  const status   = document.getElementById('apply-status');
+
+  if (!name || !relation) {
+    status.textContent = 'Fyll i namn och hur du är släkt.';
+    status.style.color = '#e06060';
+    return;
+  }
+  if (!email) {
+    status.textContent = 'E-postadress saknas — logga in med Google först.';
+    status.style.color = '#e06060';
+    return;
+  }
+
+  const btn = document.getElementById('apply-submit');
+  btn.disabled = true;
+  status.textContent = 'Skickar…';
+  status.style.color = '#888';
+
+  try {
+    const params = new URLSearchParams({ action: 'apply', name, email, relation, lang });
+    // no-cors: vi kan inte läsa svaret men Apps Script tar emot anropet
+    await fetch(`${APPS_SCRIPT_URL}?${params}`, { mode: 'no-cors' });
+    showApplyView('pending');
+  } catch(e) {
+    status.textContent = 'Något gick fel. Försök igen eller kontakta Lasse direkt.';
+    status.style.color = '#e06060';
+    btn.disabled = false;
+  }
+}
+
+
+
+// Stäng modal vid klick utanför rutan
+document.getElementById('apply-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeApplyModal();
+});
+
+// ════ INIT ════
+render(currentRoot);
+renderDetail(currentRoot);
+
+// Starta GIS så fort biblioteket är laddat — hanterar auto-login för återvändande användare
+// och gör Google-knappen redo direkt när modalen öppnas
+(function waitAndInitGSI() {
+  if (typeof google !== 'undefined') {
+    initGSI();
+  } else {
+    setTimeout(waitAndInitGSI, 150);
+  }
+})();
+
+// ?signin=1 i välkomstmailet: öppna modalen direkt
+if (new URLSearchParams(location.search).get('signin') === '1') {
+  (function waitForGSI() {
+    if (gsiReady) {
+      openApplyModal();
+    } else {
+      setTimeout(waitForGSI, 150);
+    }
+  })();
+}
 </script>
 </body>
 </html>
