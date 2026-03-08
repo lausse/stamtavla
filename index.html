@@ -202,21 +202,6 @@ canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
 .det-photo-del:hover { color: #e06060; }
 .det-photo-add { margin-top: 6px; font-size: 12px; }
 
-/* ── Foto-miniatyrer ── */
-.photo-thumb-grid { display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px; }
-.photo-thumb-item { position:relative;width:72px;height:72px;border-radius:6px;overflow:hidden;background:#f0f0f0;cursor:pointer;flex-shrink:0; }
-.photo-thumb-item img { width:100%;height:100%;object-fit:cover; }
-.photo-thumb-fallback { display:none;width:100%;height:100%;align-items:center;justify-content:center;font-size:22px; }
-.photo-thumb-del { position:absolute;top:2px;right:2px;background:rgba(0,0,0,0.5);color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0; }
-/* ── Lightbox ── */
-#photo-lightbox { display:none;position:fixed;inset:0;background:rgba(0,0,0,0.92);z-index:9000;align-items:center;justify-content:center;flex-direction:column; }
-#photo-lightbox.open { display:flex; }
-#lbx-caption { color:#ccc;font-size:13px;text-align:center;max-width:80vw; }
-#lbx-close { position:absolute;top:14px;right:18px;color:#fff;font-size:28px;cursor:pointer;line-height:1;background:none;border:none; }
-#lbx-prev, #lbx-next { position:absolute;top:50%;transform:translateY(-50%);color:#fff;font-size:40px;cursor:pointer;background:none;border:none;padding:10px;opacity:0.7;line-height:1; }
-#lbx-prev { left:6px; }
-#lbx-next { right:6px; }
-#lbx-prev:hover, #lbx-next:hover { opacity:1; }
 
 /* ── Fotoikon på kort ── */
 .photo-dot {
@@ -1197,21 +1182,14 @@ async function renderDetail(id) {
     if (items.length === 0) {
       html += `<div class="det-note" style="margin-bottom:6px">Inga foton kopplade ännu.</div>`;
     } else {
-      html += `<div class="photo-thumb-grid">`;
       items.forEach((item, idx) => {
         const url   = typeof item === 'string' ? item : item.url;
         const label = typeof item === 'string' ? `Foto ${idx + 1}` : (item.text || `Foto ${idx + 1}`);
-        const safeLabel = label.replace(/'/g,"&#39;").replace(/"/g,'&quot;');
-        html += `<div class="photo-thumb-item" onclick="openLightbox('${id}',${idx})" title="${safeLabel}">
-          <img src="${url}" alt="${safeLabel}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
-          <div class="photo-thumb-fallback" style="flex-direction:column;gap:3px;padding:4px;text-align:center">
-            <span style="font-size:20px">📷</span>
-            <span style="font-size:9px;color:#666;line-height:1.2;word-break:break-word">${label.length > 18 ? label.slice(0,16)+'…' : label}</span>
-          </div>
-          ${isAdmin ? `<button class="photo-thumb-del" onclick="event.stopPropagation();deleteAdminPhoto('${id}',${idx})" title="Ta bort">✕</button>` : ''}
+        html += `<div class="det-photo-row">
+          <a class="det-photo-lnk" href="${url}" target="_blank" rel="noopener">📷 ${label}</a>
+          ${isAdmin ? `<button class="det-photo-del" onclick="deleteAdminPhoto('${id}',${idx})" title="Ta bort">✕</button>` : ''}
         </div>`;
       });
-      html += `</div>`;
     }
     html += `</div>
       <button class="det-link det-photo-add" onclick="showAddPhotoForm('${id}')">＋ Lägg till foto</button>
@@ -1354,86 +1332,6 @@ function goHome() {
   backBtn.disabled = true;
 }
 
-// ════ LIGHTBOX ════
-let lbxItems = [], lbxIdx = 0;
-
-function ensureLightbox() {
-  if (document.getElementById('photo-lightbox')) return;
-  const div = document.createElement('div');
-  div.id = 'photo-lightbox';
-  div.innerHTML =
-    `<button id="lbx-close" onclick="closeLightbox()">✕</button>
-     <button id="lbx-prev" onclick="lbxNav(-1)">&#8249;</button>
-     <div id="lbx-content" style="display:flex;flex-direction:column;align-items:center;gap:14px;max-width:90vw">
-       <img id="lbx-img" src="" alt="" style="max-width:90vw;max-height:75vh;object-fit:contain;border-radius:4px;display:block">
-       <div id="lbx-fallback" style="display:none;flex-direction:column;align-items:center;gap:14px;color:#ddd">
-         <div style="font-size:48px">📷</div>
-         <div id="lbx-fallback-label" style="font-size:14px;color:#bbb;text-align:center"></div>
-         <a id="lbx-open-link" href="" target="_blank" rel="noopener"
-            style="padding:10px 22px;background:#5ab6e0;color:#fff;text-decoration:none;border-radius:8px;font-size:14px;font-weight:600">
-           Öppna foto &#8599;
-         </a>
-         <div style="font-size:11px;color:#666;text-align:center">Bilden kan inte visas direkt – klicka för att öppna i nytt fönster</div>
-       </div>
-       <div id="lbx-caption" style="color:#ccc;font-size:13px;text-align:center"></div>
-     </div>
-     <button id="lbx-next" onclick="lbxNav(1)">&#8250;</button>`;
-  div.addEventListener('click', e => { if (e.target === div) closeLightbox(); });
-  document.body.appendChild(div);
-}
-
-window.openLightbox = function(pid, idx) {
-  lbxItems = (PHOTOS[pid] || []).map(item => ({
-    url:   typeof item === 'string' ? item : item.url,
-    label: typeof item === 'string' ? '' : (item.text || '')
-  }));
-  lbxIdx = idx;
-  ensureLightbox();
-  showLbxSlide();
-};
-
-function showLbxSlide() {
-  const item = lbxItems[lbxIdx];
-  if (!item) return;
-  const img     = document.getElementById('lbx-img');
-  const fallback = document.getElementById('lbx-fallback');
-  const caption  = document.getElementById('lbx-caption');
-  const counter  = item.label ? `${item.label}  (${lbxIdx+1}/${lbxItems.length})` : `${lbxIdx+1} / ${lbxItems.length}`;
-
-  // Reset state
-  img.style.display = 'block';
-  fallback.style.display = 'none';
-  img.src = '';
-
-  img.onerror = () => {
-    img.style.display = 'none';
-    fallback.style.display = 'flex';
-    document.getElementById('lbx-fallback-label').textContent = item.label || '';
-    document.getElementById('lbx-open-link').href = item.url;
-  };
-  img.src = item.url;
-
-  caption.textContent = counter;
-  document.getElementById('lbx-prev').style.display = lbxItems.length > 1 ? '' : 'none';
-  document.getElementById('lbx-next').style.display = lbxItems.length > 1 ? '' : 'none';
-  document.getElementById('photo-lightbox').classList.add('open');
-}
-
-function closeLightbox() {
-  document.getElementById('photo-lightbox')?.classList.remove('open');
-}
-
-function lbxNav(dir) {
-  lbxIdx = (lbxIdx + dir + lbxItems.length) % lbxItems.length;
-  showLbxSlide();
-}
-
-document.addEventListener('keydown', e => {
-  if (!document.getElementById('photo-lightbox')?.classList.contains('open')) return;
-  if (e.key === 'Escape') closeLightbox();
-  else if (e.key === 'ArrowLeft')  lbxNav(-1);
-  else if (e.key === 'ArrowRight') lbxNav(1);
-});
 
 // ════ TOAST ════
 let toastTimer = null;
