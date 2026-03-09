@@ -8,6 +8,7 @@
 <!-- Firebase (valfritt — fyll i FIREBASE_CONFIG nedan för kommentarer och admin-redigering) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -2195,121 +2196,139 @@ function renderPhotoIndicators() {
   });
 }
 
-// ════ GOOGLE PHOTOS API ════
-let gPhotosToken = null;
-let gTokenClient = null;
+// ════ GOOGLE PHOTOS PICKER API ════
+let gPickerToken = null;
+let gPickerClient = null;
 
-function ensureTokenClient() {
-  if (gTokenClient) return;
-  gTokenClient = google.accounts.oauth2.initTokenClient({
+function ensurePickerClient() {
+  if (gPickerClient) return;
+  gPickerClient = google.accounts.oauth2.initTokenClient({
     client_id: GOOG_CLIENT_ID,
-    scope: 'https://www.googleapis.com/auth/photoslibrary.readonly',
+    scope: 'https://www.googleapis.com/auth/photospicker.mediaitems.readonly',
     callback: (resp) => {
-      if (resp.error === 'interaction_required' || resp.error === 'access_denied') {
-        // Tyst auth misslyckades — försök igen med synlig dialog
-        gTokenClient.requestAccessToken({ prompt: 'consent' });
-        return;
-      }
       if (resp.error) { showToast('Google Photos: ' + resp.error); return; }
-      gPhotosToken = resp.access_token;
-      window._gPhotosTokenCallback?.();
+      gPickerToken = resp.access_token;
+      window._gPickerCallback?.();
     }
   });
 }
 
-function requestPhotosToken(cb) {
-  ensureTokenClient();
-  window._gPhotosTokenCallback = cb;
-  if (gPhotosToken) { cb(); return; }
-  gTokenClient.requestAccessToken({ prompt: 'none' });
+function requestPickerToken(cb) {
+  ensurePickerClient();
+  window._gPickerCallback = cb;
+  if (gPickerToken) { cb(); return; }
+  gPickerClient.requestAccessToken({ prompt: '' });
 }
 
-async function gPhotosGet(url) {
-  const r = await fetch(url, { headers: { Authorization: 'Bearer ' + gPhotosToken } });
-  if (r.status === 401) { gPhotosToken = null; throw new Error('token_expired'); }
-  if (!r.ok) throw new Error(await r.text());
-  return r.json();
-}
-
-async function listGPhotoAlbums() {
-  const data = await gPhotosGet('https://photoslibrary.googleapis.com/v1/albums?pageSize=50');
-  return data.albums || [];
-}
-
-async function listAlbumPhotos(albumId) {
-  const r = await fetch('https://photoslibrary.googleapis.com/v1/mediaItems:search', {
-    method: 'POST',
-    headers: { Authorization: 'Bearer ' + gPhotosToken, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ albumId, pageSize: 100 })
-  });
-  if (!r.ok) throw new Error(await r.text());
-  const data = await r.json();
-  return data.mediaItems || [];
-}
-
-// Öppna Google Photos-väljare i add-foto-formuläret
 window.openGPhotoPicker = function(personId) {
+  const container = document.getElementById('gphotos-picker');
   const status = document.getElementById('add-photo-status');
-  status.textContent = 'Hämtar album från Google Photos…';
+  status.textContent = 'Loggar in på Google Photos…';
   status.style.color = '#888';
-  requestPhotosToken(async () => {
+
+  requestPickerToken(async () => {
+    status.textContent = '';
     try {
-      const albums = await listGPhotoAlbums();
-      // Filtrera fram Stavla-album om det finns, annars visa alla
-      const stavlaAlbums = albums.filter(a => a.title?.startsWith('Stavla:'));
-      const showAlbums = stavlaAlbums.length ? stavlaAlbums : albums;
-      renderAlbumPicker(showAlbums, personId);
-      status.textContent = '';
+      // Skapa Picker-session
+      const sessResp = await fetch('https://photospicker.googleapis.com/v1/sessions', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + gPickerToken }
+      });
+      if (!sessResp.ok) throw new Error(await sessResp.text());
+      const session = await sessResp.json();
+
+      // Öppna picker-popup
+      const popup = window.open(session.pickerUri, 'gpicker',
+        'width=720,height=700,menubar=no,toolbar=no,location=no');
+
+      container.innerHTML = '<div style="font-size:11px;color:#888">Välj ett foto i popup-fönstret… ⌛</div>';
+
+      let done = false;
+
+      // Polla tills användaren valt
+      const pollTimer = setInterval(async () => {
+        try {
+          const pollResp = await fetch(
+            `https://photospicker.googleapis.com/v1/sessions/${session.id}`,
+            { headers: { Authorization: 'Bearer ' + gPickerToken } }
+          );
+          if (!pollResp.ok) return;
+          const pollData = await pollResp.json();
+          if (pollData.mediaItemsSet) {
+            done = true;
+            clearInterval(pollTimer);
+            clearInterval(closeCheck);
+            popup?.close();
+            await handlePickerDone(session.id, personId);
+          }
+        } catch(e) { /* ignorera poll-fel */ }
+      }, 2000);
+
+      // Kolla om popup stängs manuellt
+      const closeCheck = setInterval(() => {
+        if (popup?.closed && !done) {
+          clearInterval(pollTimer);
+          clearInterval(closeCheck);
+          container.innerHTML = '<div style="font-size:11px;color:#aaa">Stängd utan val.</div>';
+        }
+      }, 500);
+
     } catch(e) {
-      if (e.message === 'token_expired') { gTokenClient.requestAccessToken(); return; }
-      status.textContent = 'Fel: ' + e.message; status.style.color = '#e06060';
+      status.textContent = 'Fel: ' + e.message;
+      status.style.color = '#e06060';
     }
   });
 };
 
-function renderAlbumPicker(albums, personId) {
+async function handlePickerDone(sessionId, personId) {
   const container = document.getElementById('gphotos-picker');
-  if (!container) return;
-  if (!albums.length) { container.innerHTML = '<div style="font-size:11px;color:#aaa">Inga album hittades.</div>'; return; }
-  container.innerHTML = `
-    <div style="font-size:11px;color:#888;margin-bottom:5px">Välj album:</div>
-    <div style="max-height:130px;overflow-y:auto;display:flex;flex-direction:column;gap:2px">
-      ${albums.map(a => `
-        <button onclick="loadAlbumPhotos('${a.id}','${personId}')"
-          style="text-align:left;padding:4px 8px;border:1px solid #eee;border-radius:5px;background:#fff;cursor:pointer;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-          📁 ${a.title} <span style="color:#ccc">(${a.mediaItemsCount||'?'})</span>
-        </button>`).join('')}
-    </div>`;
-}
-
-window.loadAlbumPhotos = async function(albumId, personId) {
-  const container = document.getElementById('gphotos-picker');
-  container.innerHTML = '<div style="font-size:11px;color:#888">Laddar foton…</div>';
+  container.innerHTML = '<div style="font-size:11px;color:#888">Hämtar valt foto…</div>';
   try {
-    const items = await listAlbumPhotos(albumId);
-    if (!items.length) { container.innerHTML = '<div style="font-size:11px;color:#aaa">Albumet är tomt.</div>'; return; }
+    const itemsResp = await fetch(
+      `https://photospicker.googleapis.com/v1/mediaItems?sessionId=${sessionId}`,
+      { headers: { Authorization: 'Bearer ' + gPickerToken } }
+    );
+    if (!itemsResp.ok) throw new Error(await itemsResp.text());
+    const itemsData = await itemsResp.json();
+    const item = (itemsData.mediaItems || [])[0];
+    if (!item) { container.innerHTML = '<div style="font-size:11px;color:#aaa">Inget foto valdes.</div>'; return; }
+
+    const baseUrl  = item.mediaFile?.baseUrl;
+    const filename = item.mediaFile?.filename || `foto_${Date.now()}.jpg`;
+
+    container.innerHTML = '<div style="font-size:11px;color:#888">Laddar upp till molnet… ☁️</div>';
+
+    // Ladda ned bilden från Google
+    const imgResp = await fetch(baseUrl + '=d');
+    if (!imgResp.ok) throw new Error('Kunde inte ladda ned bilden från Google');
+    const blob = await imgResp.blob();
+
+    // Ladda upp till Firebase Storage
+    const storage = firebase.storage();
+    const storageRef = storage.ref(`stavla-foton/${personId}/${Date.now()}_${filename}`);
+    const snapshot = await storageRef.put(blob, { contentType: blob.type || 'image/jpeg' });
+    const downloadUrl = await snapshot.ref.getDownloadURL();
+
+    // Fyll i formuläret
+    document.getElementById('new-photo-url').value = downloadUrl;
+    if (!document.getElementById('new-photo-text').value) {
+      document.getElementById('new-photo-text').value =
+        filename.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ');
+    }
+
     container.innerHTML = `
-      <div style="font-size:11px;color:#888;margin-bottom:5px">Klicka på ett foto för att välja:</div>
-      <div style="max-height:160px;overflow-y:auto;display:flex;flex-direction:column;gap:2px">
-        ${items.map(m => `
-          <button onclick="selectGPhoto('${m.productUrl}','${(m.description||'').replace(/'/g,'&#39;')}')"
-            style="text-align:left;padding:4px 8px;border:1px solid #eee;border-radius:5px;background:#fff;cursor:pointer;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
-            📷 ${m.description || m.filename || m.id}
-          </button>`).join('')}
-      </div>
-      <button onclick="openGPhotoPicker('${personId}')" style="margin-top:5px;font-size:10px;color:#aaa;background:none;border:none;cursor:pointer">← Tillbaka till album</button>`;
+      <div style="font-size:11px;color:#52bb52;margin-bottom:5px">✓ Foto uppladdat!</div>
+      <img src="${downloadUrl}" style="max-width:100%;max-height:110px;border-radius:6px;object-fit:cover">`;
+
+    // Radera Picker-session
+    fetch(`https://photospicker.googleapis.com/v1/sessions/${sessionId}`, {
+      method: 'DELETE', headers: { Authorization: 'Bearer ' + gPickerToken }
+    }).catch(() => {});
+
   } catch(e) {
     container.innerHTML = `<div style="font-size:11px;color:#e06060">Fel: ${e.message}</div>`;
   }
-};
-
-window.selectGPhoto = function(url, desc) {
-  document.getElementById('new-photo-url').value  = url;
-  document.getElementById('new-photo-text').value = desc;
-  const container = document.getElementById('gphotos-picker');
-  container.innerHTML = `<div style="font-size:11px;color:#52bb52">✓ Foto valt — fyll i personer och spara.</div>`;
-  document.getElementById('new-photo-url').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-};
+}
 
 // ════ ANSÖKNINGSMODAL ════
 function openApplyModal() {
