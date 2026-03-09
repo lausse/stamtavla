@@ -1185,7 +1185,7 @@ async function renderDetail(id) {
       items.forEach((item, idx) => {
         const url   = typeof item === 'string' ? item : item.url;
         const label = typeof item === 'string' ? `Foto ${idx + 1}` : (item.text || `Foto ${idx + 1}`);
-        const isEmbed = url && url.startsWith('data:');
+        const isEmbed = url && (url.startsWith('data:') || url.includes('lh3.googleusercontent.com') || url.includes('googleusercontent.com'));
         html += `<div class="det-photo-row" style="flex-direction:column;align-items:flex-start;gap:4px">
           ${isEmbed
             ? `<div style="position:relative;width:100%">
@@ -1454,8 +1454,10 @@ function showAddPhotoForm(personId) {
         </button>
       </div>
       <div id="gphotos-picker" style="margin-bottom:7px"></div>
-      <div style="font-size:11px;color:#aaa;margin-bottom:5px;line-height:1.5">Eller klistra in en länk manuellt:</div>
-      <input id="new-photo-url" type="text" placeholder="https://photos.google.com/photo/…">
+      <div style="font-size:11px;color:#aaa;margin-bottom:5px;line-height:1.5">Eller klistra in en Google Photos-delningslänk:</div>
+      <input id="new-photo-url" type="text" placeholder="https://photos.google.com/photo/…"
+        oninput="onPhotoUrlInput(this.value)">
+      <div id="photo-url-preview" style="margin-top:6px"></div>
     </div>
     <div class="apply-field" style="margin-bottom:8px">
       <label>Bildtext</label>
@@ -2005,6 +2007,8 @@ document.querySelectorAll('.lang-btn').forEach(btn =>
 // ════════════════════════════════════════════════════════
 const GOOG_CLIENT_ID  = '954461686218-bh0238cc4ddd2eld8ju6dqb5350qaomp.apps.googleusercontent.com';
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwgRXCv0_UmjFfLb8mVb4fH_Ei_ikcD5sWXUIza82SiZM8oTZkBNnXeTCiradJkdozcHQ/exec';
+// Cloudflare Worker för Google Photos-upplösning — uppdatera efter deploy:
+const GPHOTOS_WORKER_URL = 'https://stavla-photos.DITT-NAMN.workers.dev';
 
 // ════ AUTH STATE ════
 let authUser  = null;  // { email, name, picture }
@@ -2202,6 +2206,49 @@ function renderPhotoIndicators() {
     if (dtRow) dtRow.appendChild(dot);
   });
 }
+
+// ════ GOOGLE PHOTOS URL-RESOLVER (via Cloudflare Worker) ════
+
+let _resolveTimer = null;
+
+window.onPhotoUrlInput = function(val) {
+  const preview = document.getElementById('photo-url-preview');
+  if (!preview) return;
+  clearTimeout(_resolveTimer);
+
+  if (!val || !val.includes('photos.google.com')) {
+    // Vanlig URL — visa direkt som bild om möjligt
+    if (val && (val.startsWith('http') || val.startsWith('data:'))) {
+      preview.innerHTML = `<img src="${val}" style="max-width:100%;max-height:110px;border-radius:6px;object-fit:cover;margin-top:2px" onerror="this.style.display='none'">`;
+    } else {
+      preview.innerHTML = '';
+    }
+    return;
+  }
+
+  if (GPHOTOS_WORKER_URL.includes('DITT-NAMN')) {
+    preview.innerHTML = '<div style="font-size:11px;color:#e06060">Worker ej konfigurerad ännu.</div>';
+    return;
+  }
+
+  preview.innerHTML = '<div style="font-size:11px;color:#888">Hämtar bild från Google Photos…</div>';
+
+  _resolveTimer = setTimeout(async () => {
+    try {
+      const resp = await fetch(`${GPHOTOS_WORKER_URL}?url=${encodeURIComponent(val)}`);
+      const data = await resp.json();
+      if (data.error) throw new Error(data.error);
+
+      // Ersätt inmatat värde med den riktiga bild-URL:en
+      document.getElementById('new-photo-url').value = data.imageUrl;
+      preview.innerHTML = `
+        <div style="font-size:11px;color:#52bb52;margin-bottom:4px">✓ Bild hittad</div>
+        <img src="${data.imageUrl}" style="max-width:100%;max-height:130px;border-radius:6px;object-fit:cover">`;
+    } catch(e) {
+      preview.innerHTML = `<div style="font-size:11px;color:#e06060">Fel: ${e.message}</div>`;
+    }
+  }, 600);
+};
 
 // ════ GOOGLE PHOTOS PICKER API ════
 let gPickerToken = null;
