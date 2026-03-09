@@ -2283,7 +2283,7 @@ window.onPhotoUrlInput = function(val) {
   if (!preview) return;
   clearTimeout(_resolveTimer);
 
-  if (!val || !val.includes('photos.google.com')) {
+  if (!val || (!val.includes('photos.google.com') && !val.includes('photos.app.goo.gl'))) {
     // Vanlig URL — visa direkt som bild om möjligt
     if (val && (val.startsWith('http') || val.startsWith('data:'))) {
       preview.innerHTML = `<img src="${val}" style="max-width:100%;max-height:110px;border-radius:6px;object-fit:cover;margin-top:2px" onerror="this.style.display='none'">`;
