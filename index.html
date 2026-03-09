@@ -1502,16 +1502,11 @@ function showAddPhotoForm(personId) {
   form.style.marginTop = '8px';
   form.innerHTML = `
     <div class="apply-field" style="margin-bottom:7px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
-        <label style="margin:0">Länk till bilden</label>
-        <button onclick="openGPhotoPicker('${personId}')"
-          style="font-size:11px;padding:3px 10px;background:#4285F4;color:#fff;border:none;border-radius:5px;cursor:pointer;display:flex;align-items:center;gap:4px">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
-          Välj från Google Photos
-        </button>
+      <div style="margin-bottom:5px">
+        <label>Länk till bilden</label>
       </div>
       <div id="gphotos-picker" style="margin-bottom:7px"></div>
-      <div style="font-size:11px;color:#aaa;margin-bottom:5px;line-height:1.5">Eller klistra in en Google Photos-delningslänk:</div>
+      <div style="font-size:11px;color:#aaa;margin-bottom:5px;line-height:1.5">Klistra in en Google Photos-delningslänk:</div>
       <input id="new-photo-url" type="text" placeholder="https://photos.google.com/photo/…"
         oninput="onPhotoUrlInput(this.value)">
       <div id="photo-url-preview" style="margin-top:6px"></div>
