@@ -8,7 +8,6 @@
 <!-- Firebase (valfritt — fyll i FIREBASE_CONFIG nedan för kommentarer och admin-redigering) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -1186,9 +1185,17 @@ async function renderDetail(id) {
       items.forEach((item, idx) => {
         const url   = typeof item === 'string' ? item : item.url;
         const label = typeof item === 'string' ? `Foto ${idx + 1}` : (item.text || `Foto ${idx + 1}`);
-        html += `<div class="det-photo-row">
-          <a class="det-photo-lnk" href="${url}" target="_blank" rel="noopener">📷 ${label}</a>
-          ${isAdmin ? `<button class="det-photo-del" onclick="deleteAdminPhoto('${id}',${idx})" title="Ta bort">✕</button>` : ''}
+        const isEmbed = url && url.startsWith('data:');
+        html += `<div class="det-photo-row" style="flex-direction:column;align-items:flex-start;gap:4px">
+          ${isEmbed
+            ? `<div style="position:relative;width:100%">
+                <img src="${url}" style="width:100%;max-height:200px;object-fit:cover;border-radius:7px;cursor:pointer;display:block"
+                     onclick="this.style.maxHeight=this.style.maxHeight==='none'?'200px':'none'" title="Klicka för att förstora">
+                <div style="font-size:10px;color:#888;margin-top:3px;padding:0 2px">${label}</div>
+               </div>`
+            : `<a class="det-photo-lnk" href="${url}" target="_blank" rel="noopener">📷 ${label}</a>`
+          }
+          ${isAdmin ? `<button class="det-photo-del" onclick="deleteAdminPhoto('${id}',${idx})" title="Ta bort" style="align-self:flex-end;margin-top:-2px">✕</button>` : ''}
         </div>`;
       });
     }
@@ -1448,7 +1455,7 @@ function showAddPhotoForm(personId) {
       </div>
       <div id="gphotos-picker" style="margin-bottom:7px"></div>
       <div style="font-size:11px;color:#aaa;margin-bottom:5px;line-height:1.5">Eller klistra in en länk manuellt:</div>
-      <input id="new-photo-url" type="url" placeholder="https://photos.google.com/photo/…">
+      <input id="new-photo-url" type="text" placeholder="https://photos.google.com/photo/…">
     </div>
     <div class="apply-field" style="margin-bottom:8px">
       <label>Bildtext</label>
@@ -2280,6 +2287,24 @@ window.openGPhotoPicker = function(personId) {
   });
 };
 
+async function compressToBase64(blob, maxWidth = 1200, quality = 0.78) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objUrl = URL.createObjectURL(blob);
+    img.onload = () => {
+      URL.revokeObjectURL(objUrl);
+      const scale = Math.min(1, maxWidth / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width  = Math.round(img.width  * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = reject;
+    img.src = objUrl;
+  });
+}
+
 async function handlePickerDone(sessionId, personId) {
   const container = document.getElementById('gphotos-picker');
   container.innerHTML = '<div style="font-size:11px;color:#888">Hämtar valt foto…</div>';
@@ -2296,29 +2321,25 @@ async function handlePickerDone(sessionId, personId) {
     const baseUrl  = item.mediaFile?.baseUrl;
     const filename = item.mediaFile?.filename || `foto_${Date.now()}.jpg`;
 
-    container.innerHTML = '<div style="font-size:11px;color:#888">Laddar upp till molnet… ☁️</div>';
+    container.innerHTML = '<div style="font-size:11px;color:#888">Komprimerar bild…</div>';
 
-    // Ladda ned bilden från Google
+    // Ladda ned + komprimera
     const imgResp = await fetch(baseUrl + '=d');
     if (!imgResp.ok) throw new Error('Kunde inte ladda ned bilden från Google');
     const blob = await imgResp.blob();
+    const dataUrl = await compressToBase64(blob);
 
-    // Ladda upp till Firebase Storage
-    const storage = firebase.storage();
-    const storageRef = storage.ref(`stavla-foton/${personId}/${Date.now()}_${filename}`);
-    const snapshot = await storageRef.put(blob, { contentType: blob.type || 'image/jpeg' });
-    const downloadUrl = await snapshot.ref.getDownloadURL();
-
-    // Fyll i formuläret
-    document.getElementById('new-photo-url').value = downloadUrl;
+    // Fyll i URL-fältet med base64
+    document.getElementById('new-photo-url').value = dataUrl;
     if (!document.getElementById('new-photo-text').value) {
       document.getElementById('new-photo-text').value =
         filename.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ');
     }
 
+    const kb = Math.round(dataUrl.length * 0.75 / 1024);
     container.innerHTML = `
-      <div style="font-size:11px;color:#52bb52;margin-bottom:5px">✓ Foto uppladdat!</div>
-      <img src="${downloadUrl}" style="max-width:100%;max-height:110px;border-radius:6px;object-fit:cover">`;
+      <div style="font-size:11px;color:#52bb52;margin-bottom:5px">✓ Redo att sparas (~${kb} KB)</div>
+      <img src="${dataUrl}" style="max-width:100%;max-height:130px;border-radius:6px;object-fit:cover">`;
 
     // Radera Picker-session
     fetch(`https://photospicker.googleapis.com/v1/sessions/${sessionId}`, {
