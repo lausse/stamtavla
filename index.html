@@ -2224,7 +2224,7 @@ function requestPickerToken(cb) {
   ensurePickerClient();
   window._gPickerCallback = cb;
   if (gPickerToken) { cb(); return; }
-  gPickerClient.requestAccessToken({ prompt: '' });
+  gPickerClient.requestAccessToken({ prompt: 'consent' });
 }
 
 window.openGPhotoPicker = function(personId) {
