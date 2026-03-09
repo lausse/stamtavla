@@ -1604,6 +1604,13 @@ window.editPhotoPersons = function(photoUrl, photoText, currentPersonId) {
     )
   );
 
+  // Hitta befintlig sourceUrl om den finns
+  let existingSourceUrl = '';
+  for (const pid of linked) {
+    const item = (PHOTOS[pid] || []).find(i => (typeof i === 'string' ? i : i.url) === photoUrl);
+    if (item && typeof item === 'object' && item.sourceUrl) { existingSourceUrl = item.sourceUrl; break; }
+  }
+
   const allPersons = Object.entries(P).sort((a,b) => (P[a[0]].n||'').localeCompare(P[b[0]].n||''));
 
   const modal = document.createElement('div');
@@ -1613,8 +1620,14 @@ window.editPhotoPersons = function(photoUrl, photoText, currentPersonId) {
     <div style="background:#fff;border-radius:12px;padding:18px;width:320px;max-height:80vh;display:flex;flex-direction:column;gap:10px;box-shadow:0 8px 32px rgba(0,0,0,.25)">
       <div style="font-weight:600;font-size:14px">✏️ Redigera koppling</div>
       <div style="font-size:11px;color:#888;margin-top:-6px">${photoText}</div>
+      <div style="display:flex;flex-direction:column;gap:3px">
+        <label style="font-size:11px;color:#666">Google Photos-länk (valfritt):</label>
+        <input id="edit-photo-source-url" type="text" value="${existingSourceUrl}"
+          placeholder="https://photos.app.goo.gl/..."
+          style="font-size:11px;padding:5px 7px;border:1px solid #ddd;border-radius:6px;width:100%;box-sizing:border-box">
+      </div>
       <div style="font-size:11px;color:#666;margin-bottom:2px">Kryssa i alla som är med på fotot:</div>
-      <div style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:4px;max-height:50vh">
+      <div style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:4px;max-height:40vh">
         ${allPersons.map(([pid, p]) => `
           <label style="display:flex;align-items:center;gap:7px;font-size:12px;cursor:pointer;padding:3px 2px">
             <input type="checkbox" value="${pid}" ${linked.has(pid) ? 'checked' : ''}
@@ -1638,11 +1651,27 @@ window.savePhotoPersonEdits = async function(photoUrl, photoText, currentPersonI
   const prev    = new Set(Object.keys(PHOTOS).filter(pid =>
     (PHOTOS[pid] || []).some(item => (typeof item === 'string' ? item : item.url) === photoUrl)
   ));
+  const sourceUrl = (document.getElementById('edit-photo-source-url').value || '').trim() || null;
 
   try {
     // Lägg till foto för nyckryssade
     for (const pid of checked) {
-      if (!prev.has(pid)) await savePhotoToFirebase(pid, photoUrl, photoText);
+      if (!prev.has(pid)) await savePhotoToFirebase(pid, photoUrl, photoText, sourceUrl);
+    }
+    // Uppdatera sourceUrl på befintliga
+    for (const pid of prev) {
+      if (checked.has(pid)) {
+        const items = (PHOTOS[pid] || []).map(item => {
+          const u = typeof item === 'string' ? item : item.url;
+          if (u !== photoUrl) return item;
+          const updated = typeof item === 'string' ? { url: item } : { ...item };
+          if (sourceUrl) updated.sourceUrl = sourceUrl;
+          else delete updated.sourceUrl;
+          return updated;
+        });
+        await db.collection('photos').doc(pid).set({ items });
+        PHOTOS[pid] = items;
+      }
     }
     // Ta bort för avkryssade
     for (const pid of prev) {
