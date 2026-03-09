@@ -48,7 +48,8 @@ canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
 
 .info { flex: 1; min-width: 0; }
 .nm { font-size: 11px; font-weight: 700; color: #222; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dt { font-size: 9.5px; color: #888; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dt-row { display:flex; align-items:center; gap:3px; margin-top:1px; }
+.dt { font-size: 9.5px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex:1; min-width:0; }
 .note { font-size: 9px; color: #aaa; font-style: italic; }
 
 .sibs { margin-top: 5px; padding-top: 4px; border-top: 1px solid rgba(0,0,0,.07); display: flex; align-items: flex-start; gap: 5px; }
@@ -205,9 +206,8 @@ canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
 
 /* ── Fotoikon på kort ── */
 .photo-dot {
-  position: absolute; top: 3px; right: 5px;
-  font-size: 11px; line-height: 1;
-  text-decoration: none; opacity: .65;
+  font-size: 10px; line-height: 1; background: none; border: none;
+  cursor: pointer; padding: 0; opacity: .6; flex-shrink: 0;
 }
 .photo-dot:hover { opacity: 1; }
 
@@ -1224,7 +1224,7 @@ async function renderDetail(id) {
         <button onclick="doAddComment('${id}')" style="align-self:flex-end;padding:5px 16px;background:#333;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:12px">${lang==='de'?'Senden':lang==='en'?'Send':'Skicka'}</button>
       </div>`;
     } else {
-      html += `<div style="font-size:12px;color:#aaa;text-align:center;padding:4px">${lang==='de'?'Melden Sie sich an, um zu kommentieren.':lang==='en'?'Sign in to comment.':'Logga in för att kommentera.'}</div>`;
+      html += `<div style="font-size:12px;color:#aaa;text-align:center;padding:4px"><a href="#" onclick="event.preventDefault();openApplyModal()" style="color:#5ab6e0;text-decoration:none">${lang==='de'?'Anmelden zum Kommentieren →':lang==='en'?'Sign in to comment →':'Logga in för att kommentera →'}</a></div>`;
     }
     html += '</div>';
   }
@@ -1437,13 +1437,21 @@ function showAddPhotoForm(personId) {
   form.style.marginTop = '8px';
   form.innerHTML = `
     <div class="apply-field" style="margin-bottom:7px">
-      <label>Länk till bilden</label>
-      <div style="font-size:11px;color:#aaa;margin-bottom:5px;line-height:1.5">Klistra in en <strong>offentlig delningslänk</strong> — foton kan inte laddas upp direkt. Dela från Google Photos, iCloud eller Dropbox och kopiera länken.</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+        <label style="margin:0">Länk till bilden</label>
+        <button onclick="openGPhotoPicker('${personId}')"
+          style="font-size:11px;padding:3px 10px;background:#4285F4;color:#fff;border:none;border-radius:5px;cursor:pointer;display:flex;align-items:center;gap:4px">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+          Välj från Google Photos
+        </button>
+      </div>
+      <div id="gphotos-picker" style="margin-bottom:7px"></div>
+      <div style="font-size:11px;color:#aaa;margin-bottom:5px;line-height:1.5">Eller klistra in en länk manuellt:</div>
       <input id="new-photo-url" type="url" placeholder="https://photos.google.com/photo/…">
     </div>
     <div class="apply-field" style="margin-bottom:8px">
-      <label>Bildtext (valfri)</label>
-      <input id="new-photo-text" type="text" placeholder="T.ex. Familjeporträtt 1952">
+      <label>Bildtext</label>
+      <input id="new-photo-text" type="text" placeholder="Fylls i automatiskt från Google Photos">
     </div>
     <div class="apply-field" style="margin-bottom:10px">
       <label>Koppla till personer <span style="font-weight:400;color:#aaa">(kryssa i alla som är med)</span></label>
@@ -1633,7 +1641,9 @@ function render(rootId) {
       nm.textContent = p.n;
       info.appendChild(nm);
 
-      const dt = document.createElement('div');
+      const dtRow = document.createElement('div');
+      dtRow.className = 'dt-row';
+      const dt = document.createElement('span');
       dt.className = 'dt';
       dt.textContent = dateStr(p);
       if (p.x) {
@@ -1642,7 +1652,8 @@ function render(rootId) {
         nt.textContent = ' · ' + p.x;
         dt.appendChild(nt);
       }
-      info.appendChild(dt);
+      dtRow.appendChild(dt);
+      info.appendChild(dtRow);
 
       // Sibling chips
       let sibsDiv = null;
@@ -1711,17 +1722,6 @@ function render(rootId) {
         card.addEventListener('click', () => {
           renderDetail(id);
         });
-      }
-
-      // Fotoikon på kort (för godkända)
-      if (approved) {
-        const dot = document.createElement('button');
-        dot.className = 'photo-dot';
-        dot.textContent = '📷';
-        dot.title = 'Se foton i Google Photos';
-        dot.style.cssText = 'background:none;border:none;cursor:pointer;padding:0;';
-        dot.addEventListener('click', e => { e.stopPropagation(); openPhotoSearch(id); });
-        card.appendChild(dot);
       }
 
       wrap.appendChild(card);
@@ -2184,15 +2184,127 @@ function renderPhotoIndicators() {
   document.querySelectorAll('.card[data-id]').forEach(card => {
     if (card.querySelector('.photo-dot')) return;
     const id = card.dataset.id;
+    if (!(PHOTOS[id]?.length)) return; // bara om det finns foton
     const dot = document.createElement('button');
     dot.className = 'photo-dot';
     dot.textContent = '📷';
-    dot.title = 'Se foton i Google Photos';
-    dot.style.cssText = 'background:none;border:none;cursor:pointer;padding:0;';
+    dot.title = 'Se foton';
     dot.addEventListener('click', e => { e.stopPropagation(); openPhotoSearch(id); });
-    card.appendChild(dot);
+    const dtRow = card.querySelector('.dt-row');
+    if (dtRow) dtRow.appendChild(dot);
   });
 }
+
+// ════ GOOGLE PHOTOS API ════
+let gPhotosToken = null;
+let gTokenClient = null;
+
+function ensureTokenClient() {
+  if (gTokenClient) return;
+  gTokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: GOOG_CLIENT_ID,
+    scope: 'https://www.googleapis.com/auth/photoslibrary.readonly',
+    callback: (resp) => {
+      if (resp.error) { showToast('Google Photos: ' + resp.error); return; }
+      gPhotosToken = resp.access_token;
+      window._gPhotosTokenCallback?.();
+    }
+  });
+}
+
+function requestPhotosToken(cb) {
+  ensureTokenClient();
+  window._gPhotosTokenCallback = cb;
+  if (gPhotosToken) { cb(); return; }
+  gTokenClient.requestAccessToken({ prompt: 'none' });
+}
+
+async function gPhotosGet(url) {
+  const r = await fetch(url, { headers: { Authorization: 'Bearer ' + gPhotosToken } });
+  if (r.status === 401) { gPhotosToken = null; throw new Error('token_expired'); }
+  if (!r.ok) throw new Error(await r.text());
+  return r.json();
+}
+
+async function listGPhotoAlbums() {
+  const data = await gPhotosGet('https://photoslibrary.googleapis.com/v1/albums?pageSize=50');
+  return data.albums || [];
+}
+
+async function listAlbumPhotos(albumId) {
+  const r = await fetch('https://photoslibrary.googleapis.com/v1/mediaItems:search', {
+    method: 'POST',
+    headers: { Authorization: 'Bearer ' + gPhotosToken, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ albumId, pageSize: 100 })
+  });
+  if (!r.ok) throw new Error(await r.text());
+  const data = await r.json();
+  return data.mediaItems || [];
+}
+
+// Öppna Google Photos-väljare i add-foto-formuläret
+window.openGPhotoPicker = function(personId) {
+  const status = document.getElementById('add-photo-status');
+  status.textContent = 'Hämtar album från Google Photos…';
+  status.style.color = '#888';
+  requestPhotosToken(async () => {
+    try {
+      const albums = await listGPhotoAlbums();
+      // Filtrera fram Stavla-album om det finns, annars visa alla
+      const stavlaAlbums = albums.filter(a => a.title?.startsWith('Stavla:'));
+      const showAlbums = stavlaAlbums.length ? stavlaAlbums : albums;
+      renderAlbumPicker(showAlbums, personId);
+      status.textContent = '';
+    } catch(e) {
+      if (e.message === 'token_expired') { gTokenClient.requestAccessToken(); return; }
+      status.textContent = 'Fel: ' + e.message; status.style.color = '#e06060';
+    }
+  });
+};
+
+function renderAlbumPicker(albums, personId) {
+  const container = document.getElementById('gphotos-picker');
+  if (!container) return;
+  if (!albums.length) { container.innerHTML = '<div style="font-size:11px;color:#aaa">Inga album hittades.</div>'; return; }
+  container.innerHTML = `
+    <div style="font-size:11px;color:#888;margin-bottom:5px">Välj album:</div>
+    <div style="max-height:130px;overflow-y:auto;display:flex;flex-direction:column;gap:2px">
+      ${albums.map(a => `
+        <button onclick="loadAlbumPhotos('${a.id}','${personId}')"
+          style="text-align:left;padding:4px 8px;border:1px solid #eee;border-radius:5px;background:#fff;cursor:pointer;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+          📁 ${a.title} <span style="color:#ccc">(${a.mediaItemsCount||'?'})</span>
+        </button>`).join('')}
+    </div>`;
+}
+
+window.loadAlbumPhotos = async function(albumId, personId) {
+  const container = document.getElementById('gphotos-picker');
+  container.innerHTML = '<div style="font-size:11px;color:#888">Laddar foton…</div>';
+  try {
+    const items = await listAlbumPhotos(albumId);
+    if (!items.length) { container.innerHTML = '<div style="font-size:11px;color:#aaa">Albumet är tomt.</div>'; return; }
+    container.innerHTML = `
+      <div style="font-size:11px;color:#888;margin-bottom:5px">Klicka på ett foto för att välja:</div>
+      <div style="max-height:160px;overflow-y:auto;display:flex;flex-direction:column;gap:2px">
+        ${items.map(m => `
+          <button onclick="selectGPhoto('${m.productUrl}','${(m.description||'').replace(/'/g,'&#39;')}')"
+            style="text-align:left;padding:4px 8px;border:1px solid #eee;border-radius:5px;background:#fff;cursor:pointer;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+            📷 ${m.description || m.filename || m.id}
+          </button>`).join('')}
+      </div>
+      <button onclick="openGPhotoPicker('${personId}')" style="margin-top:5px;font-size:10px;color:#aaa;background:none;border:none;cursor:pointer">← Tillbaka till album</button>`;
+  } catch(e) {
+    container.innerHTML = `<div style="font-size:11px;color:#e06060">Fel: ${e.message}</div>`;
+  }
+};
+
+window.selectGPhoto = function(url, desc) {
+  document.getElementById('new-photo-url').value  = url;
+  document.getElementById('new-photo-text').value = desc;
+  const container = document.getElementById('gphotos-picker');
+  container.innerHTML = `<div style="font-size:11px;color:#52bb52">✓ Foto valt — fyll i personer och spara.</div>`;
+  document.getElementById('new-photo-url').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+};
 
 // ════ ANSÖKNINGSMODAL ════
 function openApplyModal() {
