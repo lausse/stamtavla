@@ -447,6 +447,13 @@ canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
       <h2>📋 Bildarkiv — ansökningar</h2>
       <button id="admin-head-close" onclick="closeAdminPanel()">✕</button>
     </div>
+    <div style="padding:8px 16px;border-bottom:1px solid #eee;display:flex;align-items:center;gap:10px">
+      <button id="migrate-photos-btn" onclick="migratePhotoUrls()"
+        style="font-size:11px;padding:4px 12px;background:#4a90d9;color:#fff;border:none;border-radius:6px;cursor:pointer">
+        🔄 Lös Google Photos-URL:er
+      </button>
+      <span style="font-size:10px;color:#aaa">Konverterar sparade goo.gl-länkar till direktbilder</span>
+    </div>
     <div id="admin-body">
       <div class="admin-empty">Laddar…</div>
     </div>
@@ -685,6 +692,49 @@ async function saveComment(personId, text) {
     timestamp: firebase.firestore.FieldValue.serverTimestamp()
   });
 }
+
+// ── Admin: migrera Google Photos-URL:er till lh3 via Worker ──
+window.migratePhotoUrls = async function() {
+  if (!db || !isAdmin) return;
+  const btn = document.getElementById('migrate-photos-btn');
+  btn.disabled = true;
+  btn.textContent = 'Kör…';
+
+  let total = 0, updated = 0, failed = 0;
+
+  for (const [pid, items] of Object.entries(PHOTOS)) {
+    if (!items?.length) continue;
+    let changed = false;
+    const newItems = await Promise.all(items.map(async item => {
+      const url  = typeof item === 'string' ? item : item.url;
+      const text = typeof item === 'string' ? '' : (item.text || '');
+      total++;
+
+      if (!url || (!url.includes('photos.google.com') && !url.includes('photos.app.goo.gl'))) {
+        return item; // redan OK
+      }
+      try {
+        const r = await fetch(`${GPHOTOS_WORKER_URL}?url=${encodeURIComponent(url)}`);
+        const d = await r.json();
+        if (d.imageUrl) {
+          changed = true; updated++;
+          btn.textContent = `Kör… (${updated} uppdaterade)`;
+          return text ? { url: d.imageUrl, text } : { url: d.imageUrl };
+        }
+      } catch(e) { /* ignorera */ }
+      failed++;
+      return item;
+    }));
+
+    if (changed) {
+      await db.collection('photos').doc(pid).set({ items: newItems });
+      PHOTOS[pid] = newItems;
+    }
+  }
+
+  btn.textContent = `✓ Klart — ${updated} uppdaterade, ${failed} misslyckades`;
+  if (currentRoot) renderDetail(currentRoot);
+};
 
 // ── Admin: spara beskrivning ──
 async function saveDesc(personId, sv, de, en) {
