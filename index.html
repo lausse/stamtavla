@@ -1236,14 +1236,17 @@ async function renderDetail(id) {
         const url   = typeof item === 'string' ? item : item.url;
         const label = typeof item === 'string' ? `Foto ${idx + 1}` : (item.text || `Foto ${idx + 1}`);
         const isEmbed = url && (url.startsWith('data:') || url.includes('lh3.googleusercontent.com') || url.includes('googleusercontent.com'));
+        const sourceUrl = typeof item === 'object' && item.sourceUrl ? item.sourceUrl : null;
+        const openUrl = sourceUrl || url;
         html += `<div class="det-photo-row" style="flex-direction:column;align-items:flex-start;gap:4px">
           ${isEmbed
             ? `<div style="position:relative;width:100%">
-                <img src="${url}" style="width:100%;max-height:200px;object-fit:cover;border-radius:7px;cursor:pointer;display:block"
-                     onclick="this.style.maxHeight=this.style.maxHeight==='none'?'200px':'none'" title="Klicka för att förstora">
+                <a href="${openUrl}" target="_blank" rel="noopener" title="Öppna originalet i Google Photos">
+                  <img src="${url}" style="width:100%;max-height:200px;object-fit:cover;border-radius:7px;cursor:pointer;display:block">
+                </a>
                 <div style="font-size:10px;color:#888;margin-top:3px;padding:0 2px">${label}</div>
                </div>`
-            : `<a class="det-photo-lnk" href="${url}" target="_blank" rel="noopener">📷 ${label}</a>`
+            : `<a class="det-photo-lnk" href="${openUrl}" target="_blank" rel="noopener">📷 ${label}</a>`
           }
           ${isAdmin ? `<div style="display:flex;gap:5px;align-self:flex-end;margin-top:2px">
             <button onclick="editPhotoPersons('${url.replace(/'/g,"\\'")}','${label.replace(/'/g,"\\'")}','${id}')"
@@ -1533,9 +1536,11 @@ function showAddPhotoForm(personId) {
   document.getElementById('new-photo-url').focus();
 }
 
-async function savePhotoToFirebase(pid, url, text) {
+async function savePhotoToFirebase(pid, url, text, sourceUrl) {
   if (!db) throw new Error('Firebase ej konfigurerat');
-  const entry = text ? { url, text } : { url };
+  const entry = { url };
+  if (text) entry.text = text;
+  if (sourceUrl) entry.sourceUrl = sourceUrl;
   const ref   = db.collection('photos').doc(pid);
   const snap  = await ref.get();
   const items = snap.exists ? (snap.data().items || []) : [];
@@ -1551,7 +1556,8 @@ async function saveAdminPhoto(personId) {
   if (!url) { status.textContent = 'Klistra in en URL.'; status.style.color = '#e06060'; return; }
   status.textContent = 'Sparar…'; status.style.color = '#888';
   try {
-    await savePhotoToFirebase(personId, url, text);
+    await savePhotoToFirebase(personId, url, text, window._photoSourceUrl || null);
+    window._photoSourceUrl = null;
     showToast('📷 Foto sparat');
     renderDetail(personId);
   } catch(e) {
@@ -2356,10 +2362,11 @@ window.onPhotoUrlInput = function(val) {
       const data = await resp.json();
       if (data.error) throw new Error(data.error);
 
-      // Ersätt inmatat värde med den riktiga bild-URL:en
+      // Ersätt inmatat värde med den riktiga bild-URL:en, spara original som sourceUrl
       document.getElementById('new-photo-url').value = data.imageUrl;
+      window._photoSourceUrl = val; // spara originallänken
       preview.innerHTML = `
-        <div style="font-size:11px;color:#52bb52;margin-bottom:4px">✓ Bild hittad</div>
+        <div style="font-size:11px;color:#52bb52;margin-bottom:4px">✓ Bild hittad — <a href="${val}" target="_blank" style="color:#4a90d9;font-size:10px">Öppna i Google Photos ↗</a></div>
         <img src="${data.imageUrl}" style="max-width:100%;max-height:130px;border-radius:6px;object-fit:cover">`;
     } catch(e) {
       preview.innerHTML = `<div style="font-size:11px;color:#e06060">Fel: ${e.message}</div>`;
