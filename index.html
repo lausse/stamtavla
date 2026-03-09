@@ -1574,7 +1574,9 @@ async function saveMultiPhoto(originPersonId) {
   status.textContent = `Sparar till ${checked.length} person${checked.length > 1 ? 'er' : ''}…`;
   status.style.color = '#888';
   try {
-    await Promise.all(checked.map(pid => savePhotoToFirebase(pid, url, text)));
+    const sourceUrl = window._photoSourceUrl || null;
+    await Promise.all(checked.map(pid => savePhotoToFirebase(pid, url, text, sourceUrl)));
+    window._photoSourceUrl = null;
     showToast(`📷 Foto kopplat till ${checked.length} person${checked.length > 1 ? 'er' : ''}`);
     renderDetail(originPersonId);
   } catch(e) {
