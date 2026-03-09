@@ -2205,6 +2205,11 @@ function ensureTokenClient() {
     client_id: GOOG_CLIENT_ID,
     scope: 'https://www.googleapis.com/auth/photoslibrary.readonly',
     callback: (resp) => {
+      if (resp.error === 'interaction_required' || resp.error === 'access_denied') {
+        // Tyst auth misslyckades — försök igen med synlig dialog
+        gTokenClient.requestAccessToken({ prompt: 'consent' });
+        return;
+      }
       if (resp.error) { showToast('Google Photos: ' + resp.error); return; }
       gPhotosToken = resp.access_token;
       window._gPhotosTokenCallback?.();
