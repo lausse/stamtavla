@@ -51,6 +51,9 @@ canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
 .dt-row { display:flex; align-items:center; gap:3px; margin-top:1px; }
 .dt { font-size: 9.5px; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex:1; min-width:0; }
 .note { font-size: 9px; color: #aaa; font-style: italic; }
+.sp-row { display:flex; align-items:center; gap:3px; margin-top:1px; }
+.sp { font-size: 9.5px; color: #a080b0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex:1; min-width:0; cursor:pointer; }
+.sp:hover { text-decoration: underline; }
 
 .sibs { margin-top: 5px; padding-top: 4px; border-top: 1px solid rgba(0,0,0,.07); display: flex; align-items: flex-start; gap: 5px; }
 .sib { font-size: 10px; padding: 2px 7px; border-radius: 10px; border: 1px solid; cursor: pointer; white-space: nowrap; transition: filter .1s; background: white; }
@@ -769,7 +772,7 @@ const P = {
   lillemor:  {n:"Lillemor Nilsson",        b:"1944",          s:"F",c:"sv", fi:"tage",      mi:"lilian"},
   perolof:   {n:"Per-Olof Nilsson",        b:"1946",d:"1992", s:"M",c:"sv", fi:"tage",      mi:"lilian"},
   elisabeth: {n:"Elisabeth Nilsson",       b:"1949",d:"2026", s:"F",c:"sv", fi:"tage",      mi:"lilian"},
-  tage:      {n:"Carl Tage Nilsson",       b:"1919",d:"1990", s:"M",c:"sv", fi:"kalle",     mi:"alma"},
+  tage:      {n:"Carl Tage Nilsson",       b:"1919",d:"1990", s:"M",c:"sv", fi:"kalle",     mi:"alma", md:"~1940"},
   lilian:    {n:"Lilian Karlsson",          b:"1920",d:"2000", s:"F",c:"svb",fi:"olof",      mi:"elsa", mn:"Nilsson",
              desc:"Lilian Aurora Karlsson, gift Nilsson. Född 3.7.1920 i Lyse, Bohuslän. Dog 25.2.2000, begravd på sin födelsedag 3.7.2000. Dotter till stenhuggaren Olof Hilmer Carlsson och Elsa Charlotta Bergman. Gift med Carl Tage Nilsson (~1940 Mjölby). OBS: Tidigare felaktigt listad som 'Bergman' — Bergman var moderns flicknamn. Källa: Riksarkivet 1930, Svenskagravar.se ✅ + Muntligt fr Leif Nilsson ✅.",
              desc_de:"Lilian Aurora Karlsson, verh. Nilsson. Geb. 3.7.1920 in Lyse, Bohuslän. Gest. 25.2.2000, begraben an ihrem Geburtstag 3.7.2000. Tochter von Olof Hilmer Carlsson und Elsa Charlotta Bergman. Früher fälschlicherweise als 'Bergman' geführt — Bergman war der Mädchenname ihrer Mutter."},
@@ -807,7 +810,7 @@ const P = {
   heddasofia:{n:"Hedda Sofia Nilsdotter",  b:"ca 1831",       s:"F",c:"sv", fi:null, mi:null,
              desc:"Hedda Sofia Nilsdotter (*ca 1831 Mjölby). Torparhustru, gift med Anders Andersson, Brunnsvig. 📷 Kabinettfotografi finns — baksida: 'Hedvig Andersson / August Linders mor'. ✅ Källa: Mjölbybor s.44 + HFL AI:29 sid.347.",
              desc_de:"Hedda Sofia Nilsdotter (*ca. 1831). Ehefrau von Anders Andersson, Brunnsvig. 📷 Kabinettphotographie vorhanden. ✅ Quelle: HFL AI:29 S.347."},
-  augustl:   {n:"Carl August Linder",      b:"25.1.1863",d:"5.11.1935", s:"M",c:"sv", fi:"andersandersson", mi:"heddasofia",
+  augustl:   {n:"Carl August Linder",      b:"25.1.1863",d:"5.11.1935", s:"M",c:"sv", fi:"andersandersson", mi:"heddasofia", md:"25.9.1887",
              desc:"Carl August Linder (*25.1.1863 Mjölby †5.11.1935 Mjölby). Murare vid vigseln 1887, senare kvarnmästare. Förf. 'Krönika fr gamla Mjölby'. Lindergatan i Mjölby är uppkallad efter honom. Gift 25.9.1887 med Hilda Carolina Gustafsdotter. Son till torparen Anders Andersson (*1826) och Hedda Sofia Nilsdotter (*1831), Brunnsvig, Mjölby Norrgård. ✅ Källa: Mjölbybor s.44 + vigselbok C:6 + HFL AI:29 sid.347.",
              desc_de:"Carl August Linder (*25.1.1863 †5.11.1935 Mjölby). Maurer bei der Heirat 1887, später Mühlenmeister. Verfasser einer Chronik. Heirat 25.9.1887 mit Hilda Carolina Gustafsdotter. ✅ Quelle: Mjölbybor + Trauungsbuch C:6 + HFL AI:29 S.347."},
   thurel:    {n:"Carl Thure Linder",       b:"1889",d:"1981", s:"M",c:"sv", fi:"augustl",   mi:"hildac",
@@ -824,7 +827,7 @@ const P = {
   carlgustafg:{n:"Carl Gustaf Gustafson",   b:"16.1.1863",     s:"M",c:"sv", fi:"fransgg",   mi:"christinaa",
              desc:"Carl Gustaf Gustafson, född 16.1.1863 i Mjölby. Bror till Hilda Carolina Gustafsdotter (*1865). Son till arbetare Frans Gustaf Gustafsson och Christina Andersdotter. ✅ Källa: HFL AI:27 sid.364, Mjölby Fattigstuga, SE/VALA/00249/A I/27.",
              desc_de:"Carl Gustaf Gustafson, geb. 16.1.1863 in Mjölby. Bruder von Hilda Carolina. ✅ Quelle: HFL AI:27 S.364."},
-  fransgg:   {n:"Frans Gustaf Gustafsson",  b:"ca 1841",       s:"M",c:"sv", fi:"gustafh",   mi:"annabn",
+  fransgg:   {n:"Frans Gustaf Gustafsson",  b:"ca 1841",       s:"M",c:"sv", fi:"gustafh",   mi:"annabn", md:"ca 1862",
              desc:"Frans Gustaf Gustafsson, arbetare i Mjölby. Son till Gustaf Hindrik Gustafsson (*1816) och Anna Brita Nilsdotter — listad bland deras barn i Linder-pärmens Nr 4. Gift ca 1862 med Christina Andersdotter (*1840 Högby). Barn: Carl Gustaf *16.1.1863 och Hilda Carolina *23.2.1865. Dog före 1880 (hustrun änka i HFL 1880–1884). ✅ Bekräftat indirekt via dopbok CI:4 + HFL AI:27 sid.364.",
              desc_de:"Frans Gustaf Gustafsson, Arbeiter in Mjölby. Sohn von Gustaf Hindrik Gustafsson und Anna Brita Nilsdotter. Verheiratet ca. 1862 mit Christina Andersdotter. Kinder: Carl Gustaf *1863, Hilda Carolina *1865. Gest. vor 1880."},
   christinaa:{n:"Christina Andersdotter",   b:"30.9.1840",     s:"F",c:"sv", fi:null,         mi:null,
@@ -833,7 +836,7 @@ const P = {
   oskarfg:   {n:"Oskar Fredrik Gustafsson", b:"1856",          s:"M",c:"sv", fi:"gustafh",   mi:"annabn",
              desc:"Oskar Fredrik Gustafsson Lindgren, född 23.6.1856 i Mjölby. Son till Gustaf Hindrik Gustafsson och Anna Brita Nilsdotter — alltså bror till Frans Gustaf Gustafsson och därigenom FARBROR till Hilda Carolina Gustafsdotter (*1865). OBS: Linder-pärmen kallar honom 'bror till Hilda' — troligt fel, korrekt relation är farbror. Gift med Johanna Carolina Andersdotter (*14.3.1849 Vreta kloster). Baptister. Flyttade till Kristinehamn 2.7.1893. Källa: Linder-pärmens Nr 2 ✅.",
              desc_de:"Oskar Fredrik Gustafsson Lindgren, geb. 23.6.1856 in Mjölby. Sohn von Gustaf Hindrik Gustafsson — also Onkel (nicht Bruder) von Hilda Carolina Gustafsdotter. Baptisten. Zog 1893 nach Kristinehamn. Quelle: Nr. 2 im Linder-Ordner ✅."},
-  gustafh:   {n:"Gustaf Hindrik Gustafsson", b:"14.8.1816",   s:"M",c:"sv", fi:null,        mi:"mariaad",
+  gustafh:   {n:"Gustaf Hindrik Gustafsson", b:"14.8.1816",   s:"M",c:"sv", fi:null,        mi:"mariaad", md:"11.7.1839",
              desc:"Gustaf Hindrik Gustafsson, född 14.8.1816 i Casabög/Ödeshög. Oäkta son till pigan Maria (Margareta) Adamsdotter — faderns namn okänt. Kvarnbyggnästare/mjölnare. Gift 11.7.1839 med Anna Brita Nilsdotter i Mjölby. Dog 22.4.1863 i Mjölby av lungsot (tbc). Barn: Frans Gustaf *1841, Johan Adolf *1843, Clara *1846, Anna Mathilda *1848, Johanna *1852, Oskar Fredrik *1856, Otto *1859. Källa: Linder-pärmens Nr 4 ✅ bildbevisat (03-nr04-05-06.heic).",
              desc_de:"Gustaf Hindrik Gustafsson, geb. 14.8.1816 in Casabög/Ödeshög. Unehelicher Sohn von Maria Adamsdotter — Vater unbekannt. Mühlenmeister. Heirat 11.7.1839 mit Anna Brita Nilsdotter. Gest. 22.4.1863 an Tuberkulose. Quelle: Nr. 4 im Linder-Ordner ✅."},
   mariaad:   {n:"Maria Adamsdotter",        b:"12.8.1793",    s:"F",c:"sv", fi:null,        mi:null,
@@ -842,7 +845,7 @@ const P = {
   annabn:    {n:"Anna Brita Nilsdotter",    b:"21.9.1814",    s:"F",c:"sv", fi:"nilsmans",  mi:"britahel",
              desc:"Anna Brita Nilsdotter, född 21.9.1814 i Åsbo. Dotter till torparen Nils Månsson (*1774 Åsbo) och Brita Helena Larsdotter (*1779). Gift 11.7.1839 med Gustaf Hindrik Gustafsson. Dog 1.5.1876 i Mjölby. Kallas 'Lindgren' i 1869–1874 års längder. Källa: Linder-pärmens Nr 5 ✅ bildbevisat (03-nr04-05-06.heic).",
              desc_de:"Anna Brita Nilsdotter, geb. 21.9.1814 in Åsbo. Tochter von Nils Månsson (*1774) und Brita Helena Larsdotter (*1779). Heirat 1839 mit Gustaf Hindrik Gustafsson. Gest. 1.5.1876. Quelle: Nr. 5 im Linder-Ordner ✅."},
-  nilsmans:  {n:"Nils Månsson",             b:"17.8.1774",    s:"M",c:"sv", fi:null,        mi:null,
+  nilsmans:  {n:"Nils Månsson",             b:"17.8.1774",    s:"M",c:"sv", fi:null,        mi:null, md:"14.5.1802",
              desc:"Nils Månsson, född 17.8.1774 i Åsbo. Torpare på Kruttorpet. Föräldrar: Måns Svensson (Nr 20) och Maria Olofsdotter (Nr 21). Gift 14.5.1802 i Åsbo med Brita Lena Larsdotter från Norra Kvisselhutt. Barn: Lena Kajsa *1803, Maja Lisa *1806, Sven *1810, Anna Brita *1814. Källa: Linder-pärmens Nr 10 ✅ bildbevisat (04-nr07-10.heic).",
              desc_de:"Nils Månsson, geb. 17.8.1774 in Åsbo. Torpare. Heirat 1802 mit Brita Lena Larsdotter. Vater von Anna Brita Nilsdotter (*1814). Quelle: Nr. 10 im Linder-Ordner ✅."},
   britahel:  {n:"Brita Helena Larsdotter",  b:"6.11.1779",    s:"F",c:"sv", fi:"larsmag",   mi:"catharinasv",
@@ -860,7 +863,7 @@ const P = {
   carlolausen:{n:"Carl Olausen",            b:"1858",d:"2.4.1937",s:"M",c:"svb",fi:null,    mi:null,
              desc:"Carl Olausen, *1858, †2 april 1937 i Roppestad, Norge. Far till Olof Hilmer Carlsson. Stenhuggare och sjöman. Syndikalist. Under kriget (troligen 1:a världskriget) odlade han kaniner som slaktades och åts — sannolikt ett överlevnadsminne. ✅ Muntligt fr Leif Nilsson.",
              desc_de:"Carl Olausen, *1858, †2. April 1937 in Roppestad, Norwegen. Vater von Olof Hilmer Carlsson. Steinmetz und Seemann. Syndikalist. Kaninchenzucht während des Krieges. ✅ Mündlich von Leif Nilsson."},
-  olof:      {n:"Olof Hilmer Carlsson",    b:"1883",          s:"M",c:"svb",fi:"carlolausen",mi:null,
+  olof:      {n:"Olof Hilmer Carlsson",    b:"1883",          s:"M",c:"svb",fi:"carlolausen",mi:null, md:"15.3.1908",
              desc:"Olof Hilmer Carlsson, *9.12.1883 Hogdal, Bohuslän. Stenhuggare; jobbade i Norrland och Norge. Gift 15.3.1908 med Elsa Charlotta Bergman; inflyttad till Lyse från Lysekil 1913. Son till Carl Olausen (*1858 †2.4.1937 Roppestad, Norge). ✅ Riksarkivet dopbok 1910.",
              desc_de:"Olof Hilmer Carlsson, *9.12.1883 Hogdal, Bohuslän. Steinmetz; arbeitete in Norrland und Norwegen. Heirat 15.3.1908 mit Elsa Charlotta Bergman. Sohn von Carl Olausen (*1858 †1937 Roppestad). ✅ Reichsarchiv Taufbuch 1910."},
   elsa:      {n:"Elsa Charlotta Bergman",  b:"1890",          s:"F",c:"svb",fi:"alfred",    mi:"amanda", mn:"Carlsson"},
@@ -2035,6 +2038,23 @@ function render(rootId) {
       }
       dtRow.appendChild(dt);
       info.appendChild(dtRow);
+
+      // Marriage row(s)
+      const spouses = getSpouses(id);
+      spouses.forEach(spouse => {
+        const spRow = document.createElement('div');
+        spRow.className = 'sp-row';
+        const spEl = document.createElement('span');
+        spEl.className = 'sp';
+        const md = p.md || spouse.md || '';
+        const sParts = spouse.n.split(' ');
+        const spName = sParts.length >= 3 ? sParts[0] + ' ' + sParts[1] : sParts[0];
+        spEl.textContent = '⚭' + (md ? ' ' + md : '') + ' ' + spName;
+        spEl.title = spouse.n + (md ? ', gift ' + md : '');
+        spEl.addEventListener('click', e => { e.stopPropagation(); focusPerson(spouse.id); });
+        spRow.appendChild(spEl);
+        info.appendChild(spRow);
+      });
 
       // Sibling chips
       let sibsDiv = null;
