@@ -1278,18 +1278,18 @@ async function renderDetail(id) {
         const tagged = getTaggedPersons(url);
         const taggedHtml = tagged.map(pid => {
           const tp = P[pid]; if (!tp) return '';
-          const col = COLORS[tp.c] || '#bbb';
-          const initials = (tp.n||pid).split(' ').filter(Boolean).map(w=>w[0]).join('').slice(0,2).toUpperCase();
-          return `<button onclick="focusPerson('${pid}')" title="${displayName(tp).replace(/"/g,'&quot;')}" style="width:26px;height:26px;border-radius:50%;background:${col};color:#fff;border:none;cursor:pointer;font-size:9px;font-weight:700;flex-shrink:0;line-height:1">${initials}</button>`;
+          const tParts = (tp.n||'').split(' ');
+          const tName = tParts.length >= 3 ? tParts[0] + ' ' + tParts[1] : tParts[0];
+          const yr = tp.b ? ' ' + (tp.b||'').replace('~','').replace('ca ','').substring(0,4) : '';
+          return `<button onclick="focusPerson('${pid}')" title="${displayName(tp).replace(/"/g,'&quot;')}" class="sib sib-${tp.c||'unk'}">${tName}${yr}</button>`;
         }).join('');
         html += `<div class="det-photo-row" style="flex-direction:column;align-items:flex-start;gap:4px">
           ${isEmbed
             ? `<div style="position:relative;width:100%">
                 <a href="${openUrl}" target="_blank" rel="noopener" title="Öppna i Google Photos">
                   <img src="${url}" style="width:100%;max-height:200px;object-fit:cover;border-radius:7px;cursor:pointer;display:block">
-                  ${openUrl !== url ? '<div style="position:absolute;bottom:6px;right:6px;background:rgba(0,0,0,.45);border-radius:4px;padding:2px 6px;font-size:10px;color:#fff;pointer-events:none">↗ Google Photos</div>' : ''}
                 </a>
-                ${tagged.length > 0 ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:5px">${taggedHtml}</div>` : ''}
+                ${tagged.length > 0 ? `<div class="chips" style="margin-top:6px">${taggedHtml}</div>` : ''}
                 <div style="font-size:10px;color:#888;margin-top:3px;padding:0 2px">${label}</div>
                </div>`
             : `<a class="det-photo-lnk" href="${openUrl}" target="_blank" rel="noopener">📷 ${label}</a>`
@@ -1503,6 +1503,7 @@ function focusPerson(id) {
   if (!P[id] || id === currentRoot) return;
   hist.push({id: currentRoot, zoom, scrollLeft: viewport.scrollLeft, scrollTop: viewport.scrollTop});
   currentRoot = id;
+  history.replaceState(null, '', '#' + id);
   const doRender = () => { render(id); renderDetail(id); };
   if (document.startViewTransition) {
     wrap.querySelectorAll('.card[data-id]').forEach(c => {
@@ -2350,6 +2351,13 @@ function setLang(l) {
   document.querySelector('#apply-view-pending h2').textContent = L.pendingTitle;
   document.querySelector('#apply-view-pending p').innerHTML =
     L.pendingText + '<br><br><small id="apply-pending-note" style="color:#bbb"></small>';
+
+  // Direktlänk via ?p=personid eller #personid i URL:en
+  const urlParams = new URLSearchParams(window.location.search);
+  const deepId = urlParams.get('p') || window.location.hash.replace('#', '');
+  if (deepId && P[deepId]) {
+    currentRoot = deepId;
+  }
 
   render(currentRoot);
   renderDetail(currentRoot);
