@@ -1662,11 +1662,11 @@ function showAddPhotoForm(personId) {
   const checkboxes = sorted.map(([id, p]) => {
     const col = COLORS[p.c] || '#bbb';
     const checked = id === personId ? 'checked' : '';
-    return `<label class="photo-person-row" style="display:flex;align-items:center;gap:5px;padding:1px 0;cursor:pointer;font-size:11px">
-      <input type="checkbox" name="photo-persons" value="${id}" ${checked} onchange="filterPhotoPersons()" style="accent-color:${col};width:13px;height:13px">
+    return `<div class="photo-person-row" onclick="var cb=this.querySelector('input');cb.checked=!cb.checked;filterPhotoPersons()" style="display:flex;align-items:center;gap:5px;padding:3px 2px;cursor:pointer;font-size:11px;border-radius:4px;user-select:none">
+      <input type="checkbox" name="photo-persons" value="${id}" ${checked} style="accent-color:${col};width:13px;height:13px;flex-shrink:0;pointer-events:none">
       <span style="width:7px;height:7px;border-radius:50%;background:${col};flex-shrink:0;display:inline-block"></span>
       ${p.n}${p.b ? ` <span style="color:#bbb;font-size:10px">*${p.b}</span>` : ''}
-    </label>`;
+    </div>`;
   }).join('');
 
   const form = document.createElement('div');
@@ -1803,13 +1803,14 @@ window.editPhotoPersons = function(photoUrl, photoText, currentPersonId) {
       </div>
       ${chipsHtml}
       <div style="font-size:11px;color:#666">Kryssa i alla som är med på fotot:</div>
-      <div id="edit-photo-checklist" style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:4px;max-height:40vh;border:1px solid #eee;border-radius:7px;padding:6px 8px;background:#fafafa">
+      <div id="edit-photo-checklist" style="overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:2px;max-height:40vh;border:1px solid #eee;border-radius:7px;padding:6px 8px;background:#fafafa">
         ${allPersons.map(([pid, p]) => `
-          <label style="display:flex;align-items:center;gap:7px;font-size:12px;cursor:pointer;padding:3px 2px">
+          <div data-pid="${pid}" onclick="var cb=this.querySelector('input');cb.checked=!cb.checked" style="display:flex;align-items:center;gap:7px;font-size:12px;cursor:pointer;padding:4px 3px;border-radius:4px;user-select:none">
             <input type="checkbox" value="${pid}" ${linked.has(pid) ? 'checked' : ''}
-              style="width:14px;height:14px;cursor:pointer">
+              onclick="event.stopPropagation();this.checked=!this.checked"
+              style="width:14px;height:14px;cursor:pointer;flex-shrink:0;pointer-events:none">
             ${p.n || pid} ${p.b ? `<span style="color:#aaa;font-size:10px">*${p.b}</span>` : ''}
-          </label>`).join('')}
+          </div>`).join('')}
       </div>
       <div style="display:flex;gap:8px;margin-top:2px">
         <button onclick="savePhotoPersonEdits('${photoUrl.replace(/'/g,"\\'")}','${currentPersonId}')"
@@ -1820,13 +1821,16 @@ window.editPhotoPersons = function(photoUrl, photoText, currentPersonId) {
     </div>`;
   document.body.appendChild(modal);
 
-  requestAnimationFrame(() => {
-    // Auto-scroll till första kryssade person
-    const list = document.getElementById('edit-photo-checklist');
-    const firstChecked = list?.querySelector('input:checked');
-    if (firstChecked) firstChecked.closest('label').scrollIntoView({ block: 'center' });
+  // Auto-scroll synkront — ingen animation, inget fokus
+  const list = document.getElementById('edit-photo-checklist');
+  const firstChecked = list?.querySelector('input:checked');
+  if (firstChecked && list) {
+    const row = firstChecked.closest('[data-pid]');
+    if (row) list.scrollTop = Math.max(0, row.offsetTop - list.clientHeight / 3);
+  }
 
-    // Drag-and-drop ordning
+  // Drag-and-drop ordning (separat, kräver inga layout-beräkningar)
+  requestAnimationFrame(() => {
     const chipsEl = document.getElementById('edit-photo-chips');
     if (!chipsEl) return;
     let dragging = null;
