@@ -1247,6 +1247,11 @@ async function renderDetail(id) {
               style="width:100%;font-size:12px;padding:4px 6px;border:1px solid #ddd;border-radius:6px">
           </div>
         </div>
+        <div style="margin-bottom:8px">
+          <div style="font-size:11px;color:#aaa;margin-bottom:3px">Giftermålsdatum (⚭)</div>
+          <input id="det-edit-md" type="text" value="${(p.md||'').replace(/"/g,'&quot;')}" placeholder="t.ex. 25.9.1887 eller ~1940"
+            style="width:100%;font-size:12px;padding:4px 6px;border:1px solid #ddd;border-radius:6px">
+        </div>
         <div style="font-size:11px;color:#aaa;margin-bottom:4px">Beskrivning (svenska)</div>
         <textarea id="det-edit-sv" style="width:100%;min-height:70px;font-size:12px;padding:6px;border:1px solid #ddd;border-radius:6px;font-family:inherit;resize:vertical;margin-bottom:6px">${(p.desc||'').replace(/</g,'&lt;')}</textarea>
         <div style="font-size:11px;color:#aaa;margin-bottom:4px">Tyska</div>
@@ -1425,11 +1430,13 @@ window.doSavePerson = async function(id) {
   const en = document.getElementById('det-edit-en')?.value || '';
   const b  = (document.getElementById('det-edit-b')?.value || '').trim();
   const d  = (document.getElementById('det-edit-d')?.value || '').trim();
+  const md = (document.getElementById('det-edit-md')?.value || '').trim();
 
   // Spara text + datum
   const data = { descSv: sv, descDe: de, descEn: en };
   if (b) data.b = b; else data.b = null;
   if (d) data.d = d; else data.d = null;
+  if (md) data.md = md; else data.md = null;
   await db.collection('persons').doc(id).set(data, { merge: true });
   if (P[id]) {
     if (sv) P[id].desc = sv;
@@ -1437,6 +1444,7 @@ window.doSavePerson = async function(id) {
     if (en) P[id].desc_en = en;
     if (b) P[id].b = b;
     if (d) P[id].d = d;
+    if (md) P[id].md = md; else delete P[id].md;
   }
 
   // Spara barn (fi/mi)
@@ -1593,6 +1601,7 @@ async function loadPersonsFromFirestore() {
       if (d.descEn) P[id].desc_en = d.descEn;
       if (d.b)  P[id].b  = d.b;
       if (d.d)  P[id].d  = d.d;
+      if (d.md) P[id].md = d.md;
       if (d.fi) P[id].fi = d.fi;
       if (d.mi) P[id].mi = d.mi;
     });
