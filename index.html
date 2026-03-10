@@ -472,6 +472,7 @@ canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
   </div>
   <div id="auth-zone">
     <button id="admin-btn" onclick="openAdminPanel()" title="Bildarkiv — ansökningar">📋 Admin</button>
+    <button id="add-person-btn" onclick="openAddPersonModal()" title="Lägg till ny person" style="display:none;padding:5px 10px;border-radius:6px;border:1px solid #ddd;background:#fff;font-size:12px;cursor:pointer">＋ Person</button>
     <button id="auth-open-btn" onclick="openApplyModal()">📷 Bildarkiv</button>
     <div id="user-chip">
       <img id="user-pic" src="" alt="">
@@ -1209,6 +1210,66 @@ async function renderDetail(id) {
 
   html += '<div class="det-body">';
 
+  // Admin: redigera-knapp direkt under headern
+  if (isAdmin && db) {
+    const isFather = p.s === 'M';
+    const currentChildren = Object.keys(P).filter(cid => cid !== id && (isFather ? P[cid].fi === id : P[cid].mi === id));
+    const currentSibPids  = Object.keys(P).filter(cid => cid !== id && p.fi && (P[cid].fi === p.fi || P[cid].mi === p.mi));
+    const otherPersons = Object.entries(P).filter(([cid, cp]) => cid !== id && cp.n).sort((a,b)=>(a[1].n||'').localeCompare(b[1].n||''));
+
+    const barnChecks = otherPersons.map(([cid, cp]) => `
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;padding:2px 0">
+        <input type="checkbox" data-childid="${cid}" ${currentChildren.includes(cid)?'checked':''} style="width:12px;height:12px">
+        ${cp.n||cid} ${cp.b?`<span style="color:#ccc;font-size:10px">*${cp.b}</span>`:''}
+      </label>`).join('');
+
+    const syskonChecks = otherPersons.map(([cid, cp]) => `
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;padding:2px 0">
+        <input type="checkbox" data-sibid="${cid}" ${currentSibPids.includes(cid)?'checked':''} style="width:12px;height:12px">
+        ${cp.n||cid} ${cp.b?`<span style="color:#ccc;font-size:10px">*${cp.b}</span>`:''}
+      </label>`).join('');
+
+    html += `<div style="margin-bottom:10px">
+      <button id="det-edit-toggle" onclick="document.getElementById('det-edit-form').style.display='';this.style.display='none'" style="padding:3px 10px;font-size:11px;color:#aaa;background:none;border:1px solid #ddd;border-radius:5px;cursor:pointer">✏️ Redigera</button>
+      <div id="det-edit-form" style="display:none;margin-top:8px;padding:10px;background:#f9f9f9;border-radius:8px;border:1px solid #eee">
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <div style="flex:1">
+            <div style="font-size:11px;color:#aaa;margin-bottom:3px">Födelseår/-datum</div>
+            <input id="det-edit-b" type="text" value="${(p.b||'').replace(/"/g,'&quot;')}" placeholder="t.ex. 1920"
+              style="width:100%;font-size:12px;padding:4px 6px;border:1px solid #ddd;border-radius:6px">
+          </div>
+          <div style="flex:1">
+            <div style="font-size:11px;color:#aaa;margin-bottom:3px">Dödsår/-datum</div>
+            <input id="det-edit-d" type="text" value="${(p.d||'').replace(/"/g,'&quot;')}" placeholder="t.ex. 1990"
+              style="width:100%;font-size:12px;padding:4px 6px;border:1px solid #ddd;border-radius:6px">
+          </div>
+        </div>
+        <div style="font-size:11px;color:#aaa;margin-bottom:4px">Beskrivning (svenska)</div>
+        <textarea id="det-edit-sv" style="width:100%;min-height:70px;font-size:12px;padding:6px;border:1px solid #ddd;border-radius:6px;font-family:inherit;resize:vertical;margin-bottom:6px">${(p.desc||'').replace(/</g,'&lt;')}</textarea>
+        <div style="font-size:11px;color:#aaa;margin-bottom:4px">Tyska</div>
+        <textarea id="det-edit-de" style="width:100%;min-height:70px;font-size:12px;padding:6px;border:1px solid #ddd;border-radius:6px;font-family:inherit;resize:vertical;margin-bottom:6px">${(p.desc_de||'').replace(/</g,'&lt;')}</textarea>
+        <div style="font-size:11px;color:#aaa;margin-bottom:4px">Engelska (tom = auto-translate)</div>
+        <textarea id="det-edit-en" style="width:100%;min-height:70px;font-size:12px;padding:6px;border:1px solid #ddd;border-radius:6px;font-family:inherit;resize:vertical;margin-bottom:8px">${(p.desc_en||'').replace(/</g,'&lt;')}</textarea>
+        <details style="margin-bottom:8px">
+          <summary style="font-size:11px;color:#aaa;cursor:pointer;user-select:none">Barn (${p.s==='M'?'far':'mor'})</summary>
+          <div id="det-edit-children" style="max-height:150px;overflow-y:auto;border:1px solid #eee;border-radius:6px;padding:6px 8px;margin-top:6px;background:#fafafa;display:flex;flex-direction:column;gap:2px">
+            ${barnChecks}
+          </div>
+        </details>
+        <details style="margin-bottom:10px">
+          <summary style="font-size:11px;color:#aaa;cursor:pointer;user-select:none">Syskon (delar minst en förälder)</summary>
+          <div id="det-edit-siblings" style="max-height:150px;overflow-y:auto;border:1px solid #eee;border-radius:6px;padding:6px 8px;margin-top:6px;background:#fafafa;display:flex;flex-direction:column;gap:2px">
+            ${syskonChecks}
+          </div>
+        </details>
+        <div style="display:flex;gap:8px">
+          <button onclick="doSavePerson('${id}')" style="padding:5px 14px;background:#333;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">Spara</button>
+          <button onclick="document.getElementById('det-edit-form').style.display='none';document.getElementById('det-edit-toggle').style.display=''" style="padding:5px 12px;background:#eee;border:none;border-radius:6px;cursor:pointer;font-size:12px">Avbryt</button>
+        </div>
+      </div>
+    </div>`;
+  }
+
   // Description — auto-translate till engelska om desc_en saknas
   const t = LANG[lang];
   let descText = p['desc_' + lang] || (lang !== 'sv' ? '' : p.desc);
@@ -1307,64 +1368,6 @@ async function renderDetail(id) {
     </div>`;
   }
 
-  // Admin: liten redigera-knapp + dold editor
-  if (isAdmin && db) {
-    // Bygg syskon- och barn-listor för redigeringen
-    const isFather = p.s === 'M';
-    const currentChildren = Object.keys(P).filter(cid => cid !== id && (isFather ? P[cid].fi === id : P[cid].mi === id));
-    const currentSibPids  = Object.keys(P).filter(cid => cid !== id && p.fi && (P[cid].fi === p.fi || P[cid].mi === p.mi));
-    const otherPersons = Object.entries(P).filter(([cid, cp]) => cid !== id && cp.n).sort((a,b)=>(a[1].n||'').localeCompare(b[1].n||''));
-
-    const barnChecks = otherPersons.map(([cid, cp]) => `
-      <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;padding:2px 0">
-        <input type="checkbox" data-childid="${cid}" ${currentChildren.includes(cid)?'checked':''} style="width:12px;height:12px">
-        ${cp.n||cid} ${cp.b?`<span style="color:#ccc;font-size:10px">*${cp.b}</span>`:''}
-      </label>`).join('');
-
-    const syskonChecks = otherPersons.map(([cid, cp]) => `
-      <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;padding:2px 0">
-        <input type="checkbox" data-sibid="${cid}" ${currentSibPids.includes(cid)?'checked':''} style="width:12px;height:12px">
-        ${cp.n||cid} ${cp.b?`<span style="color:#ccc;font-size:10px">*${cp.b}</span>`:''}
-      </label>`).join('');
-
-    html += `<button id="det-edit-toggle" onclick="document.getElementById('det-edit-form').style.display='';this.style.display='none'" style="margin:4px 0 10px;padding:3px 10px;font-size:11px;color:#aaa;background:none;border:1px solid #ddd;border-radius:5px;cursor:pointer">✏️ Redigera</button>
-    <div id="det-edit-form" style="display:none">
-      <div style="display:flex;gap:8px;margin-bottom:8px">
-        <div style="flex:1">
-          <div style="font-size:11px;color:#aaa;margin-bottom:3px">Födelseår/-datum</div>
-          <input id="det-edit-b" type="text" value="${(p.b||'').replace(/"/g,'&quot;')}" placeholder="t.ex. 1920 eller 3.7.1920"
-            style="width:100%;font-size:12px;padding:4px 6px;border:1px solid #ddd;border-radius:6px">
-        </div>
-        <div style="flex:1">
-          <div style="font-size:11px;color:#aaa;margin-bottom:3px">Dödsår/-datum</div>
-          <input id="det-edit-d" type="text" value="${(p.d||'').replace(/"/g,'&quot;')}" placeholder="t.ex. 1990"
-            style="width:100%;font-size:12px;padding:4px 6px;border:1px solid #ddd;border-radius:6px">
-        </div>
-      </div>
-      <div style="font-size:11px;color:#aaa;margin-bottom:4px">Svenska</div>
-      <textarea id="det-edit-sv" style="width:100%;min-height:70px;font-size:12px;padding:6px;border:1px solid #ddd;border-radius:6px;font-family:inherit;resize:vertical;margin-bottom:6px">${(p.desc||'').replace(/</g,'&lt;')}</textarea>
-      <div style="font-size:11px;color:#aaa;margin-bottom:4px">Tyska</div>
-      <textarea id="det-edit-de" style="width:100%;min-height:70px;font-size:12px;padding:6px;border:1px solid #ddd;border-radius:6px;font-family:inherit;resize:vertical;margin-bottom:6px">${(p.desc_de||'').replace(/</g,'&lt;')}</textarea>
-      <div style="font-size:11px;color:#aaa;margin-bottom:4px">Engelska (tom = auto-translate)</div>
-      <textarea id="det-edit-en" style="width:100%;min-height:70px;font-size:12px;padding:6px;border:1px solid #ddd;border-radius:6px;font-family:inherit;resize:vertical;margin-bottom:8px">${(p.desc_en||'').replace(/</g,'&lt;')}</textarea>
-      <details style="margin-bottom:8px">
-        <summary style="font-size:11px;color:#aaa;cursor:pointer;user-select:none">Barn (${p.s==='M'?'far':'mor'})</summary>
-        <div id="det-edit-children" style="max-height:150px;overflow-y:auto;border:1px solid #eee;border-radius:6px;padding:6px 8px;margin-top:6px;background:#fafafa;display:flex;flex-direction:column;gap:2px">
-          ${barnChecks}
-        </div>
-      </details>
-      <details style="margin-bottom:10px">
-        <summary style="font-size:11px;color:#aaa;cursor:pointer;user-select:none">Syskon (delar minst en förälder)</summary>
-        <div id="det-edit-siblings" style="max-height:150px;overflow-y:auto;border:1px solid #eee;border-radius:6px;padding:6px 8px;margin-top:6px;background:#fafafa;display:flex;flex-direction:column;gap:2px">
-          ${syskonChecks}
-        </div>
-      </details>
-      <div style="display:flex;gap:8px">
-        <button onclick="doSavePerson('${id}')" style="padding:5px 14px;background:#333;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px">Spara</button>
-        <button onclick="document.getElementById('det-edit-form').style.display='none';document.getElementById('det-edit-toggle').style.display=''" style="padding:5px 12px;background:#eee;border:none;border-radius:6px;cursor:pointer;font-size:12px">Avbryt</button>
-      </div>
-    </div>`;
-  }
 
   // Kommentarer
   if (db) {
@@ -1576,6 +1579,7 @@ async function loadPhotos() {
 async function loadPersonsFromFirestore() {
   if (!db) return;
   try {
+    // Uppdateringar till befintliga personer
     const snap = await db.collection('persons').get();
     snap.forEach(doc => {
       const id = doc.id;
@@ -1588,6 +1592,12 @@ async function loadPersonsFromFirestore() {
       if (d.d)  P[id].d  = d.d;
       if (d.fi) P[id].fi = d.fi;
       if (d.mi) P[id].mi = d.mi;
+    });
+    // Adminlaggda nya personer
+    const newSnap = await db.collection('new_persons').get();
+    newSnap.forEach(doc => {
+      const id = doc.id;
+      if (!P[id]) P[id] = { id, ...doc.data() };
     });
   } catch(e) { console.warn('loadPersonsFromFirestore:', e.message); }
 }
@@ -2426,6 +2436,7 @@ window.handleCredentialResponse = async function(response) {
     renderPhotoIndicators();
     if (isAdmin)
       document.getElementById('admin-btn').style.display = 'inline-block';
+      document.getElementById('add-person-btn').style.display = 'inline-block';
 
     // Centrera trädet på den inloggade personen om de finns i trädet
     const matchedId = matchUserToTree(authUser.name);
@@ -2478,10 +2489,126 @@ function signOut() {
   document.getElementById('user-chip').style.display = 'none';
   document.getElementById('auth-open-btn').style.display = '';
   document.getElementById('admin-btn').style.display = 'none';
+  document.getElementById('add-person-btn').style.display = 'none';
   document.querySelectorAll('.photo-dot').forEach(d => d.remove());
   closeAdminPanel();
   renderDetail(currentRoot);
 }
+
+// ════ LÄGG TILL NY PERSON ════
+function openAddPersonModal() {
+  const colorOpts = [
+    ['sv',  '🇸🇪 Svensk'],
+    ['svb', '🟢 Bohuslän/Lysekil'],
+    ['rs',  '🇷🇸 Serbisk'],
+    ['de',  '🇩🇪 Tysk'],
+    ['mix', '🔮 Blandad'],
+    ['unk', '⬜ Okänd'],
+  ];
+  const personOpts = Object.entries(P)
+    .filter(([,p]) => p.n)
+    .sort((a,b) => (a[1].n||'').localeCompare(b[1].n||''))
+    .map(([id, p]) => `<option value="${id}">${p.n}${p.b ? ' *'+p.b : ''}</option>`)
+    .join('');
+
+  const modal = document.createElement('div');
+  modal.id = 'add-person-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:12px;padding:20px;width:340px;max-height:90vh;overflow-y:auto;display:flex;flex-direction:column;gap:10px;box-shadow:0 8px 32px rgba(0,0,0,.25)">
+      <div style="font-weight:600;font-size:15px">＋ Lägg till person</div>
+      <div style="display:flex;flex-direction:column;gap:3px">
+        <label style="font-size:11px;color:#666">Fullständigt namn *</label>
+        <input id="np-name" type="text" placeholder="Förnamn Efternamn"
+          style="font-size:13px;padding:6px 8px;border:1px solid #ddd;border-radius:6px">
+      </div>
+      <div style="display:flex;gap:8px">
+        <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+          <label style="font-size:11px;color:#666">Kön</label>
+          <select id="np-sex" style="font-size:13px;padding:5px 6px;border:1px solid #ddd;border-radius:6px">
+            <option value="M">♂ Man</option>
+            <option value="F">♀ Kvinna</option>
+          </select>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+          <label style="font-size:11px;color:#666">Nationalitet</label>
+          <select id="np-color" style="font-size:13px;padding:5px 6px;border:1px solid #ddd;border-radius:6px">
+            ${colorOpts.map(([v,l]) => `<option value="${v}">${l}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+          <label style="font-size:11px;color:#666">Födelseår</label>
+          <input id="np-b" type="text" placeholder="t.ex. 1920"
+            style="font-size:13px;padding:5px 7px;border:1px solid #ddd;border-radius:6px">
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+          <label style="font-size:11px;color:#666">Dödsår</label>
+          <input id="np-d" type="text" placeholder="t.ex. 1985"
+            style="font-size:13px;padding:5px 7px;border:1px solid #ddd;border-radius:6px">
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:3px">
+        <label style="font-size:11px;color:#666">Far</label>
+        <select id="np-fi" style="font-size:12px;padding:5px 6px;border:1px solid #ddd;border-radius:6px">
+          <option value="">— ingen —</option>
+          ${personOpts}
+        </select>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:3px">
+        <label style="font-size:11px;color:#666">Mor</label>
+        <select id="np-mi" style="font-size:12px;padding:5px 6px;border:1px solid #ddd;border-radius:6px">
+          <option value="">— ingen —</option>
+          ${personOpts}
+        </select>
+      </div>
+      <div id="np-status" style="font-size:11px;min-height:14px"></div>
+      <div style="display:flex;gap:8px;margin-top:2px">
+        <button onclick="saveNewPerson()" style="flex:1;padding:8px;background:#333;color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:13px">Spara</button>
+        <button onclick="document.getElementById('add-person-modal').remove()" style="padding:8px 14px;background:#f0f0f0;border:none;border-radius:7px;cursor:pointer;font-size:13px">Avbryt</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  document.getElementById('np-name').focus();
+}
+
+window.saveNewPerson = async function() {
+  const name = (document.getElementById('np-name').value || '').trim();
+  if (!name) { document.getElementById('np-status').textContent = 'Namn krävs.'; return; }
+  const sex   = document.getElementById('np-sex').value;
+  const color = document.getElementById('np-color').value;
+  const b     = (document.getElementById('np-b').value || '').trim() || null;
+  const d     = (document.getElementById('np-d').value || '').trim() || null;
+  const fi    = document.getElementById('np-fi').value || null;
+  const mi    = document.getElementById('np-mi').value || null;
+
+  // Generera ett unikt ID från namnet
+  const baseId = name.toLowerCase()
+    .replace(/[åä]/g,'a').replace(/ö/g,'o').replace(/é/g,'e')
+    .replace(/č|ć/g,'c').replace(/š/g,'s').replace(/ž/g,'z')
+    .replace(/đ/g,'d').replace(/[^a-z0-9]/g,'').slice(0, 12);
+  let newId = baseId;
+  let suffix = 2;
+  while (P[newId]) { newId = baseId + suffix++; }
+
+  const data = { n: name, s: sex, c: color };
+  if (b)  data.b  = b;
+  if (d)  data.d  = d;
+  if (fi) data.fi = fi;
+  if (mi) data.mi = mi;
+
+  document.getElementById('np-status').textContent = 'Sparar…';
+  try {
+    await db.collection('new_persons').doc(newId).set(data);
+    P[newId] = { ...data, id: newId };
+    document.getElementById('add-person-modal').remove();
+    showToast(`✓ ${name} tillagd`);
+    focusPerson(newId);
+  } catch(e) {
+    document.getElementById('np-status').textContent = 'Fel: ' + e.message;
+  }
+};
 
 // ════ ADMIN-PANEL ════
 async function openAdminPanel() {
