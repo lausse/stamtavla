@@ -2049,8 +2049,8 @@ function _setupEditorImage(img, url, savedXFrac, savedYFrac, savedS) {
   }
   img.onload = init;
   img.src = url;
-  // For cached images, onload never fires — call init() immediately
-  if (img.complete && img.naturalWidth) init();
+  // For cached images onload never fires; use rAF so modal is visible before we read offsetWidth
+  if (img.complete && img.naturalWidth) requestAnimationFrame(init);
 }
 
 function cropSelectPhoto(url) {
@@ -2101,10 +2101,11 @@ function openCropEditor(id) {
   document.getElementById('crop-wrap').style.display    = isEmbed ? '' : 'none';
   document.querySelector('.crop-hint').style.display    = isEmbed ? '' : 'none';
   document.querySelector('.crop-zoom-row').style.display = isEmbed ? '' : 'none';
+  // Open modal FIRST so img.offsetWidth is non-zero when _setupEditorImage reads it
+  document.getElementById('crop-modal').style.display = 'flex';
+  updateCropZoomLabel();
   if (isEmbed) _setupEditorImage(document.getElementById('crop-img-editor'), _cropUrl,
     saved.x, saved.y, saved.s);
-  updateCropZoomLabel();
-  document.getElementById('crop-modal').style.display = 'flex';
 }
 
 function cropClose() { document.getElementById('crop-modal').style.display = 'none'; _cropId = null; }
