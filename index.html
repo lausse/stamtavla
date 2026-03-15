@@ -1406,9 +1406,18 @@ async function renderDetail(id) {
 
   let html = '';
 
-  // Header
+  // Header — avatar: foto om tillgängligt, annars könssymbol
+  const _photoItems = PHOTOS[id] || [];
+  const _firstEmbed = (isAdmin || approved)
+    ? _photoItems.find(item => { const u = typeof item === 'string' ? item : item.url; return u && (u.startsWith('data:') || u.includes('googleusercontent.com')); })
+    : null;
+  const _avatarUrl = _firstEmbed ? (typeof _firstEmbed === 'string' ? _firstEmbed : _firstEmbed.url) : null;
+  const _avatarHtml = _avatarUrl
+    ? `<div class="det-av" style="background:${col};padding:0;overflow:hidden"><img src="${_avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block"></div>`
+    : `<div class="det-av" style="background:${col}">${p.s==='F'?'♀':'♂'}</div>`;
+
   html += `<div class="det-head" style="background:${col}18; border-left:4px solid ${col}">
-    <div class="det-av" style="background:${col}">${p.s==='F'?'♀':'♂'}</div>
+    ${_avatarHtml}
     <div style="flex:1;min-width:0">
       <div class="det-name">${displayName(p)}</div>
       <div class="det-dates">${p.b?'*'+fmtDate(p.b):''}${p.b&&p.d?'&ensp;':''}${p.d?'†'+fmtDate(p.d):''}</div>
