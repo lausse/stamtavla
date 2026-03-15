@@ -1493,9 +1493,8 @@ async function renderDetail(id) {
 
   // Header — avatar: foto om tillgängligt, annars könssymbol
   const _photoItem = firstPhotoItem(id);
-  const _c = getCrop(id);
   const _avatarHtml = _photoItem && _photoItem.isEmbed
-    ? `<div class="det-av" style="background:${col};padding:0;overflow:hidden;position:relative;${isAdmin?'cursor:pointer':''}" ${isAdmin?`onclick="openCropEditor('${id}')" title="Klicka för att justera bildutsnitt"`:''}><img src="${_photoItem.url}" style="position:absolute;width:100%;height:100%;object-fit:cover;transform-origin:center;transform:translate(${_c.x*44}px,${_c.y*44}px) scale(${_c.s});pointer-events:none"></div>`
+    ? `<div class="det-av" data-detavid="${id}" style="background:${col};padding:0;overflow:hidden;position:relative;${isAdmin?'cursor:pointer':''}" ${isAdmin?`onclick="openCropEditor('${id}')" title="Klicka för att justera bildutsnitt"`:''}></div>`
     : _photoItem
       ? `<a href="${_photoItem.url}" target="_blank" rel="noopener" title="Öppna foto" style="display:block;text-decoration:none"><div class="det-av" style="background:${col};font-size:20px;cursor:pointer">📷</div></a>`
       : `<div class="det-av" style="background:${col}">${p.s==='F'?'♀':'♂'}</div>`;
@@ -1693,6 +1692,20 @@ async function renderDetail(id) {
 
   html += '</div>'; // det-body
   detPanel.innerHTML = html;
+  // Init embedded photo avatars in det-av (needs onload for exact crop positioning)
+  detPanel.querySelectorAll('[data-detavid]').forEach(av => {
+    const avid = av.dataset.detavid;
+    const phItem = firstPhotoItem(avid);
+    if (phItem && phItem.isEmbed) {
+      const c = getCrop(avid), sz = 44;
+      const img = document.createElement('img');
+      img.style.cssText = 'position:absolute;pointer-events:none;user-select:none';
+      img.onload = function() { positionCropImgEl(this, c, sz); };
+      img.src = phItem.url;
+      if (img.complete && img.naturalWidth) positionCropImgEl(img, c, sz);
+      av.appendChild(img);
+    }
+  });
   document.getElementById('det-close').addEventListener('click', closeDetailPanel);
 
   // Ladda kommentarer asynkront
@@ -1888,10 +1901,13 @@ function applyPhotoAvatar(av, id, p) {
   if (item && item.isEmbed) {
     av.innerHTML = '';
     av.style.cssText = 'padding:0;overflow:hidden;position:relative';
+    const c = getCrop(id);
+    const sz = 28;
     const img = document.createElement('img');
+    img.style.cssText = 'position:absolute;pointer-events:none;user-select:none';
+    img.onload = function() { positionCropImgEl(this, c, sz); };
     img.src = item.url;
-    img.style.cssText = 'position:absolute;width:100%;height:100%;object-fit:cover;transform-origin:center;pointer-events:none;user-select:none';
-    applyCropToImg(img, id, 28);
+    if (img.complete && img.naturalWidth) positionCropImgEl(img, c, sz);
     av.appendChild(img);
     if (isAdmin) {
       av.classList.add('has-photo', 'is-admin');
@@ -1963,11 +1979,31 @@ function persistCrops() {
 const CROP_CIRCLE = 160;
 const CROP_WRAP   = 220;
 
-function getCrop(id) { return AVATAR_CROPS[id] || {x: 0, y: 0, s: 1}; }
+function getCrop(id) {
+  const c = AVATAR_CROPS[id];
+  // Sanity-check: old format stored pixels (often > 1). New format stores fractions (|x|,|y| ≤ ~0.5 normally).
+  if (!c || Math.abs(c.x) > 1 || Math.abs(c.y) > 1) return {x: 0, y: 0, s: c && c.s <= 5 ? c.s : 1, photo: c && c.photo};
+  return c;
+}
+// Position an img element to show the saved crop, without object-fit:cover.
+// img must have position:absolute in an overflow:hidden container of size sz×sz.
+function positionCropImgEl(img, c, sz) {
+  const W = img.naturalWidth, H = img.naturalHeight;
+  if (!W || !H) return;
+  const coverScale = sz / Math.min(W, H);
+  const dW = W * coverScale * c.s;
+  const dH = H * coverScale * c.s;
+  img.style.width  = dW + 'px';
+  img.style.height = dH + 'px';
+  img.style.left   = ((sz - dW) / 2 + c.x * sz) + 'px';
+  img.style.top    = ((sz - dH) / 2 + c.y * sz) + 'px';
+}
 function applyCropToImg(img, id, size) {
   const c = getCrop(id);
   const sz = size || 28;
-  img.style.transform = `translate(${c.x * sz}px,${c.y * sz}px) scale(${c.s})`;
+  img.style.cssText = img.style.cssText.replace(/object-fit:[^;]+;?/g,'') + ';width:auto;height:auto';
+  function apply() { positionCropImgEl(img, c, sz); }
+  if (img.complete && img.naturalWidth) apply(); else img.addEventListener('load', apply);
 }
 
 // Crop editor state (_editorX/Y in editor-px; stored as fractions on save)
