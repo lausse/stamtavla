@@ -615,6 +615,7 @@ canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
 <div id="crop-modal">
   <div id="crop-box">
     <h3 id="crop-title">Justera bild</h3>
+    <div id="crop-photo-selector" style="display:none;flex-wrap:wrap;gap:8px;justify-content:center;max-width:220px"></div>
     <div id="crop-ring">
       <img id="crop-img-editor" draggable="false">
     </div>
@@ -1858,8 +1859,9 @@ function firstPhotoItem(id) {
   if (!(isAdmin || approved)) return null;
   const items = PHOTOS[id] || [];
   if (!items.length) return null;
-  const first = items[0];
-  const url = typeof first === 'string' ? first : first.url;
+  const savedUrl = AVATAR_CROPS[id] && AVATAR_CROPS[id].photo;
+  const found = (savedUrl && items.find(item => (typeof item === 'string' ? item : item.url) === savedUrl)) || items[0];
+  const url = typeof found === 'string' ? found : found.url;
   if (!url) return null;
   const isEmbed = url.startsWith('data:') || url.includes('googleusercontent.com');
   return { url, isEmbed };
@@ -1954,20 +1956,68 @@ function applyCropToImg(img, id) {
 }
 
 // Crop editor state
-let _cropId = null, _cropX = 0, _cropY = 0, _cropS = 1;
+let _cropId = null, _cropX = 0, _cropY = 0, _cropS = 1, _cropUrl = null;
 let _cropDragging = false, _cropDragSX = 0, _cropDragSY = 0, _cropDragX0 = 0, _cropDragY0 = 0;
 
+function cropSelectPhoto(url) {
+  _cropUrl = url;
+  _cropX = 0; _cropY = 0; _cropS = 1;
+  const img = document.getElementById('crop-img-editor');
+  img.src = url;
+  cropApplyEditor();
+  // Highlight selected thumb
+  document.querySelectorAll('.crop-thumb').forEach(el => {
+    el.style.outline = el.dataset.url === url ? '2px solid #5ab6e0' : '2px solid transparent';
+  });
+}
+
 function openCropEditor(id) {
-  const item = firstPhotoItem(id);
-  if (!item || !item.isEmbed) return;
+  const items = PHOTOS[id] || [];
+  if (!items.length) return;
   _cropId = id;
   const c = getCrop(id);
   _cropX = c.x; _cropY = c.y; _cropS = c.s;
+  _cropUrl = (c.photo) || (typeof items[0] === 'string' ? items[0] : items[0].url);
   const p = P[id];
   document.getElementById('crop-title').textContent = p ? p.n : id;
+
+  // Build photo selector
+  const sel = document.getElementById('crop-photo-selector');
+  sel.innerHTML = '';
+  if (items.length > 1) {
+    sel.style.display = 'flex';
+    items.forEach((item, i) => {
+      const url = typeof item === 'string' ? item : item.url;
+      const label = typeof item === 'object' && item.text ? item.text : `Foto ${i + 1}`;
+      const isEmbed = url && (url.startsWith('data:') || url.includes('googleusercontent.com'));
+      const thumb = document.createElement('div');
+      thumb.className = 'crop-thumb';
+      thumb.dataset.url = url;
+      thumb.title = label;
+      thumb.style.cssText = `width:40px;height:40px;border-radius:50%;overflow:hidden;flex-shrink:0;cursor:pointer;
+        outline:${url === _cropUrl ? '2px solid #5ab6e0' : '2px solid transparent'};outline-offset:2px;
+        background:#eee;display:flex;align-items:center;justify-content:center;font-size:16px`;
+      if (isEmbed) {
+        const img = document.createElement('img');
+        img.src = url;
+        img.style.cssText = 'width:100%;height:100%;object-fit:cover';
+        thumb.appendChild(img);
+      } else {
+        thumb.textContent = '📷';
+      }
+      thumb.onclick = () => cropSelectPhoto(url);
+      sel.appendChild(thumb);
+    });
+  } else {
+    sel.style.display = 'none';
+  }
+
   const img = document.getElementById('crop-img-editor');
-  img.src = item.url;
-  applyCropToImg(img, id);
+  const isEmbed = _cropUrl && (_cropUrl.startsWith('data:') || _cropUrl.includes('googleusercontent.com'));
+  document.getElementById('crop-ring').style.display = isEmbed ? '' : 'none';
+  document.querySelector('.crop-hint').style.display = isEmbed ? '' : 'none';
+  document.querySelector('.crop-zoom-row').style.display = isEmbed ? '' : 'none';
+  if (isEmbed) { img.src = _cropUrl; cropApplyEditor(); }
   updateCropZoomLabel();
   document.getElementById('crop-modal').style.display = 'flex';
 }
@@ -1987,7 +2037,7 @@ function updateCropZoomLabel() {
 }
 async function cropSave() {
   if (!_cropId) return;
-  AVATAR_CROPS[_cropId] = {x: _cropX, y: _cropY, s: _cropS};
+  AVATAR_CROPS[_cropId] = {x: _cropX, y: _cropY, s: _cropS, photo: _cropUrl};
   persistCrops();
   updateAllAvatars();
   renderDetail(_cropId);
