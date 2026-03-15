@@ -1700,10 +1700,10 @@ async function renderDetail(id) {
       const c = getCrop(avid), sz = 44;
       const img = document.createElement('img');
       img.style.cssText = 'position:absolute;pointer-events:none;user-select:none';
+      av.appendChild(img); // must be in DOM before positionCropImgEl
       img.onload = function() { positionCropImgEl(this, getCrop(avid), sz); };
       img.src = phItem.url;
       if (img.complete && img.naturalWidth) positionCropImgEl(img, getCrop(avid), sz);
-      av.appendChild(img);
     }
   });
   document.getElementById('det-close').addEventListener('click', closeDetailPanel);
@@ -1905,10 +1905,10 @@ function applyPhotoAvatar(av, id, p) {
     const sz = 28;
     const img = document.createElement('img');
     img.style.cssText = 'position:absolute;pointer-events:none;user-select:none';
+    av.appendChild(img); // must be in DOM before positionCropImgEl (needs offsetWidth)
     img.onload = function() { positionCropImgEl(this, getCrop(id), sz); };
     img.src = item.url;
     if (img.complete && img.naturalWidth) positionCropImgEl(img, getCrop(id), sz);
-    av.appendChild(img);
     if (isAdmin) {
       av.classList.add('has-photo', 'is-admin');
       av.title = 'Klicka för att justera bildutsnitt';
@@ -1992,9 +1992,15 @@ function getCrop(id) {
   return c;
 }
 // Position an img element to show the saved crop, without object-fit:cover.
-// img must have position:absolute in an overflow:hidden container of size sz×sz.
+// img must be in the DOM (position:absolute) inside an overflow:hidden container of size sz×sz.
 function positionCropImgEl(img, c, sz) {
-  const W = img.naturalWidth, H = img.naturalHeight;
+  // Use offsetWidth/Height (EXIF-corrected rendered dims) instead of naturalWidth/naturalHeight.
+  // Temporarily set auto-size so the browser reports the true oriented dimensions.
+  img.style.width = 'auto'; img.style.height = 'auto';
+  img.style.maxWidth = 'none'; img.style.maxHeight = 'none';
+  const W = img.offsetWidth || img.naturalWidth;
+  const H = img.offsetHeight || img.naturalHeight;
+  img.style.maxWidth = ''; img.style.maxHeight = '';
   if (!W || !H) return;
   const coverScale = sz / Math.min(W, H);
   const dW = W * coverScale * c.s;
@@ -2018,7 +2024,12 @@ let _cropDragging = false, _cropDragSX = 0, _cropDragSY = 0, _cropDragX0 = 0, _c
 
 function _setupEditorImage(img, url, savedXFrac, savedYFrac, savedS) {
   function init() {
-    const W = img.naturalWidth, H = img.naturalHeight;
+    // Use offsetWidth/Height for EXIF-corrected rendered dimensions
+    img.style.width = 'auto'; img.style.height = 'auto';
+    img.style.maxWidth = 'none'; img.style.maxHeight = 'none';
+    const W = img.offsetWidth || img.naturalWidth;
+    const H = img.offsetHeight || img.naturalHeight;
+    img.style.maxWidth = ''; img.style.maxHeight = '';
     if (!W || !H) return;
     const coverScale = CROP_CIRCLE / Math.min(W, H);
     const dW = W * coverScale, dH = H * coverScale;
