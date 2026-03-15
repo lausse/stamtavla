@@ -1812,7 +1812,13 @@ window.doSavePerson = async function(id) {
   for (const sid of newSpSet) {
     if (!oldExplicitSp.has(sid)) {
       const otherSp = [...new Set([...(P[sid]?.sp || []), id])];
-      await db.collection('persons').doc(sid).set({ sp: otherSp }, { merge: true });
+      const updates = { sp: otherSp };
+      // Ärv bakgrundsfärg om partnern saknar egen (unk)
+      if (P[sid]?.c === 'unk' && P[id]?.c) {
+        updates.c = P[id].c;
+        if (P[sid]) P[sid].c = updates.c;
+      }
+      await db.collection('persons').doc(sid).set(updates, { merge: true });
       if (P[sid]) P[sid].sp = otherSp;
     }
   }
