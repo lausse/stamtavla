@@ -1908,7 +1908,8 @@ function applyPhotoAvatar(av, id, p) {
     av.appendChild(img); // must be in DOM before positionCropImgEl (needs offsetWidth)
     img.onload = function() { positionCropImgEl(this, getCrop(id), sz); };
     img.src = item.url;
-    if (img.complete && img.naturalWidth) positionCropImgEl(img, getCrop(id), sz);
+    // rAF ensures card is appended to wrap (in DOM) before we read offsetWidth
+    if (img.complete && img.naturalWidth) requestAnimationFrame(() => positionCropImgEl(img, getCrop(id), sz));
     if (isAdmin) {
       av.classList.add('has-photo', 'is-admin');
       av.title = 'Klicka för att justera bildutsnitt';
