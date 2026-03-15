@@ -1442,12 +1442,14 @@ function getChildren(id) {
 }
 
 function getSpouses(id) {
-  const children = getChildren(id);
   const seen = new Set();
   const result = [];
-  children.forEach(c => {
+  getChildren(id).forEach(c => {
     const other = (c.fi === id) ? c.mi : c.fi;
     if (other && P[other] && !seen.has(other)) { seen.add(other); result.push(P[other]); }
+  });
+  (P[id]?.sp || []).forEach(sid => {
+    if (P[sid] && !seen.has(sid)) { seen.add(sid); result.push(P[sid]); }
   });
   return result;
 }
@@ -1517,6 +1519,23 @@ async function renderDetail(id) {
     const currentSibPids  = Object.keys(P).filter(cid => cid !== id && p.fi && (P[cid].fi === p.fi || P[cid].mi === p.mi));
     const otherPersons = Object.entries(P).filter(([cid, cp]) => cid !== id && cp.n).sort((a,b)=>(a[1].n||'').localeCompare(b[1].n||''));
 
+    const inferredSpouseIds = new Set(
+      getChildren(id).map(c => (c.fi === id) ? c.mi : c.fi).filter(Boolean)
+    );
+    const explicitSpouseIds = new Set(P[id]?.sp || []);
+    const spouseChecks = otherPersons.map(([cid, cp]) => {
+      const isInferred = inferredSpouseIds.has(cid);
+      const isExplicit = explicitSpouseIds.has(cid);
+      const chk = isInferred
+        ? `<input type="checkbox" checked disabled style="width:12px;height:12px;opacity:.5">`
+        : `<input type="checkbox" data-spouseid="${cid}" ${isExplicit?'checked':''} style="width:12px;height:12px">`;
+      return `<label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;padding:2px 0">
+        ${chk}
+        ${cp.n||cid}${cp.b?` <span style="color:#ccc;font-size:10px">*${fmtDate(cp.b)}</span>`:''}
+        ${isInferred?'<span style="color:#bbb;font-size:9px">(via barn)</span>':''}
+      </label>`;
+    }).join('');
+
     const barnChecks = otherPersons.map(([cid, cp]) => `
       <label style="display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;padding:2px 0">
         <input type="checkbox" data-childid="${cid}" ${currentChildren.includes(cid)?'checked':''} style="width:12px;height:12px">
@@ -1545,9 +1564,17 @@ async function renderDetail(id) {
           </div>
         </div>
         <div style="margin-bottom:8px">
-          <div style="font-size:11px;color:#aaa;margin-bottom:3px">Giftermålsdatum (⚭)</div>
+          <div style="display:flex;align-items:center;gap:7px;margin-bottom:3px">
+            <span style="font-size:11px;color:#aaa">Giftermålsdatum (⚭)</span>
+            <button type="button" id="det-edit-sp-toggle"
+              onclick="const el=document.getElementById('det-edit-sp-list');const open=el.style.display==='flex';el.style.display=open?'none':'flex';this.textContent=open?'＋ Partner':'－ Partner'"
+              style="padding:1px 7px;font-size:10px;background:#eee;border:none;border-radius:4px;cursor:pointer;color:#666;line-height:16px">＋ Partner</button>
+          </div>
           <input id="det-edit-md" type="text" value="${(p.md||'').replace(/"/g,'&quot;')}" placeholder="t.ex. 25.9.1887 eller ~1940"
             style="width:100%;font-size:12px;padding:4px 6px;border:1px solid #ddd;border-radius:6px">
+          <div id="det-edit-sp-list" style="display:none;max-height:150px;overflow-y:auto;border:1px solid #eee;border-radius:6px;padding:6px 8px;margin-top:6px;background:#fafafa;flex-direction:column;gap:2px">
+            ${spouseChecks}
+          </div>
         </div>
         <div style="font-size:11px;color:#aaa;margin-bottom:4px">Beskrivning (svenska)</div>
         <textarea id="det-edit-sv" style="width:100%;min-height:70px;font-size:12px;padding:6px;border:1px solid #ddd;border-radius:6px;font-family:inherit;resize:vertical;margin-bottom:6px">${(p.desc||'').replace(/</g,'&lt;')}</textarea>
@@ -1772,6 +1799,28 @@ window.doSavePerson = async function(id) {
     } else if (!el.checked && cur === id) {
       await db.collection('persons').doc(cid).set({ [field]: null }, { merge: true });
       if (P[cid]) delete P[cid][field];
+    }
+  }
+
+  // Spara explicita partners (sp-fält, bidirektionellt)
+  const oldExplicitSp = new Set(P[id]?.sp || []);
+  const spEls = [...document.querySelectorAll('#det-edit-sp-list input[data-spouseid]')];
+  const newSp = spEls.filter(el => el.checked).map(el => el.dataset.spouseid);
+  const newSpSet = new Set(newSp);
+  await db.collection('persons').doc(id).set({ sp: newSp.length ? newSp : null }, { merge: true });
+  if (P[id]) P[id].sp = newSp;
+  for (const sid of newSpSet) {
+    if (!oldExplicitSp.has(sid)) {
+      const otherSp = [...new Set([...(P[sid]?.sp || []), id])];
+      await db.collection('persons').doc(sid).set({ sp: otherSp }, { merge: true });
+      if (P[sid]) P[sid].sp = otherSp;
+    }
+  }
+  for (const sid of oldExplicitSp) {
+    if (!newSpSet.has(sid)) {
+      const otherSp = (P[sid]?.sp || []).filter(x => x !== id);
+      await db.collection('persons').doc(sid).set({ sp: otherSp.length ? otherSp : null }, { merge: true });
+      if (P[sid]) P[sid].sp = otherSp;
     }
   }
 
@@ -2187,6 +2236,7 @@ async function loadPersonsFromFirestore() {
       if (d.md) P[id].md = d.md;
       if (d.fi) P[id].fi = d.fi;
       if (d.mi) P[id].mi = d.mi;
+      if (Array.isArray(d.sp)) P[id].sp = d.sp;
     });
     // Adminlaggda nya personer
     const newSnap = await db.collection('new_persons').get();
