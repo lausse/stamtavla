@@ -1407,13 +1407,9 @@ async function renderDetail(id) {
   let html = '';
 
   // Header — avatar: foto om tillgängligt, annars könssymbol
-  const _photoItems = PHOTOS[id] || [];
-  const _firstEmbed = (isAdmin || approved)
-    ? _photoItems.find(item => { const u = typeof item === 'string' ? item : item.url; return u && (u.startsWith('data:') || u.includes('googleusercontent.com')); })
-    : null;
-  const _avatarUrl = _firstEmbed ? (typeof _firstEmbed === 'string' ? _firstEmbed : _firstEmbed.url) : null;
+  const _avatarUrl = firstEmbedUrl(id);
   const _avatarHtml = _avatarUrl
-    ? `<div class="det-av" style="background:${col};padding:0;overflow:hidden"><img src="${_avatarUrl}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block"></div>`
+    ? `<div class="det-av" style="background:${col};padding:0;overflow:hidden"><img src="${_avatarUrl}" style="width:100%;height:100%;object-fit:cover;object-position:center 15%;border-radius:50%;display:block"></div>`
     : `<div class="det-av" style="background:${col}">${p.s==='F'?'♀':'♂'}</div>`;
 
   html += `<div class="det-head" style="background:${col}18; border-left:4px solid ${col}">
@@ -1782,23 +1778,59 @@ function showToast(msg, ms = 3000) {
 // ════ FOTO — laddas från Apps Script (Sheet) med fallback till photos.json ════
 let PHOTOS = {};
 
+function firstEmbedUrl(id) {
+  if (!(isAdmin || approved)) return null;
+  const items = PHOTOS[id] || [];
+  const found = items.find(item => {
+    const u = typeof item === 'string' ? item : item.url;
+    return u && (u.startsWith('data:') || u.includes('googleusercontent.com'));
+  });
+  return found ? (typeof found === 'string' ? found : found.url) : null;
+}
+
+function applyPhotoAvatar(av, id, p) {
+  const url = firstEmbedUrl(id);
+  if (url) {
+    av.textContent = '';
+    av.style.padding = '0';
+    av.style.overflow = 'hidden';
+    const img = document.createElement('img');
+    img.src = url;
+    img.style.cssText = 'width:100%;height:100%;object-fit:cover;object-position:center 15%;border-radius:50%;display:block';
+    av.appendChild(img);
+  } else {
+    av.textContent = p.s === 'F' ? '♀' : '♂';
+    av.style.padding = '';
+    av.style.overflow = '';
+  }
+}
+
+function updateAllAvatars() {
+  document.querySelectorAll('.av[data-avid]').forEach(av => {
+    const id = av.dataset.avid;
+    if (P[id]) applyPhotoAvatar(av, id, P[id]);
+  });
+}
+
 async function loadPhotos() {
   // Försök Firebase först, falla tillbaka på Apps Script / photos.json
   if (db) {
     try {
       const snap = await db.collection('photos').get();
       snap.forEach(doc => { PHOTOS[doc.id] = doc.data().items || []; });
+      updateAllAvatars();
       return;
     } catch(e) {}
   }
   try {
     const r = await fetch(`${APPS_SCRIPT_URL}?action=get_photos`);
     const d = await r.json();
-    if (d && typeof d === 'object' && !d.error) { PHOTOS = d; return; }
+    if (d && typeof d === 'object' && !d.error) { PHOTOS = d; updateAllAvatars(); return; }
   } catch(e) {}
   try {
     const r = await fetch('photos.json');
     PHOTOS = await r.json();
+    updateAllAvatars();
   } catch(e) {}
 }
 async function loadPersonsFromFirestore() {
@@ -2236,7 +2268,8 @@ function render(rootId) {
       cardTop.className = 'card-top';
       const av = document.createElement('div');
       av.className = 'av';
-      av.textContent = p.s === 'F' ? '♀' : '♂';
+      av.dataset.avid = id;
+      applyPhotoAvatar(av, id, p);
       cardTop.appendChild(av);
 
       // Info block
