@@ -2017,8 +2017,9 @@ let _cropId = null, _editorX = 0, _editorY = 0, _editorS = 1, _cropUrl = null;
 let _cropDragging = false, _cropDragSX = 0, _cropDragSY = 0, _cropDragX0 = 0, _cropDragY0 = 0;
 
 function _setupEditorImage(img, url, savedXFrac, savedYFrac, savedS) {
-  img.onload = () => {
+  function init() {
     const W = img.naturalWidth, H = img.naturalHeight;
+    if (!W || !H) return;
     const coverScale = CROP_CIRCLE / Math.min(W, H);
     const dW = W * coverScale, dH = H * coverScale;
     img.style.width  = dW + 'px';
@@ -2030,13 +2031,15 @@ function _setupEditorImage(img, url, savedXFrac, savedYFrac, savedS) {
       _editorY = savedYFrac * CROP_CIRCLE;
       _editorS = savedS;
     } else {
-      // Auto-fit: scale so full image is visible in the wrap canvas
       _editorX = 0; _editorY = 0;
       _editorS = Math.min(CROP_WRAP / dW, CROP_WRAP / dH);
     }
     cropApplyEditor();
-  };
+  }
+  img.onload = init;
   img.src = url;
+  // For cached images, onload never fires — call init() immediately
+  if (img.complete && img.naturalWidth) init();
 }
 
 function cropSelectPhoto(url) {
