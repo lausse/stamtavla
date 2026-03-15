@@ -1987,8 +1987,8 @@ const CROP_WRAP   = 220;
 
 function getCrop(id) {
   const c = AVATAR_CROPS[id];
-  // Sanity-check: old format stored pixels (often > 1). New format stores fractions (|x|,|y| ≤ ~0.5 normally).
-  if (!c || Math.abs(c.x) > 1 || Math.abs(c.y) > 1) return {x: 0, y: 0, s: c && c.s <= 5 ? c.s : 1, photo: c && c.photo};
+  // Sanity-check: old format stored raw pixels (up to ±110). New format stores fractions (|x|,|y| rarely > 3).
+  if (!c || Math.abs(c.x) > 10 || Math.abs(c.y) > 10) return {x: 0, y: 0, s: c && c.s <= 20 ? c.s : 1, photo: c && c.photo};
   return c;
 }
 // Position an img element to show the saved crop, without object-fit:cover.
