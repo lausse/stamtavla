@@ -794,7 +794,8 @@ const P = {
   gurlier:   {n:"Gurli Erika Carlsson",    b:"1910-11-30",d:"1918-10-10",s:"F",c:"svb",fi:"olof",      mi:"elsa",
              desc:"Gurli Erika Carlsson, *30.11.1910 Lysekil †10.10.1918. Dotter till Olof Hilmer Carlsson och Elsa Charlotta Bergman. ✅ Riksarkivet dopbok 1910 rad 152. Dog 10 oktober 1918 (troligen spanska sjukan). ⚠️ Dödsdag bekräftad via MyHeritage Johnsson Family Tree (andrahandskälla). Notering 'II F2e' i dopboken — betydelse oklar.",
              desc_de:"Gurli Erika Carlsson, *30.11.1910 Lysekil †10.10.1918. Gest. 10. Oktober 1918 (vermutlich Spanische Grippe). ⚠️ Sterbedatum laut MyHeritage Johnsson Family Tree (Sekundärquelle)."},
-  karin:     {n:"Karin Solgund Carlsson",  b:"1923-08-16",d:"2002",s:"F",c:"svb",fi:"olof",  mi:"elsa"},
+  karin:     {n:"Karin Solgund Carlsson",  b:"1923-08-16",d:"2002-12-14",s:"F",c:"svb",fi:"olof",  mi:"elsa", md:"1952-05-17",
+             desc:"Karin Solgund Carlsson (gift Linnér), *1923-08-16 Liden, Lyse †2002-12-14 Malmö. Gift 1952-05-17 Oslo med Inge Gunnar Axel Linnér (*1919 †1996-01-08 Malmö). ⚠️ Källa: MyHeritage Linnér Web Site (andrahandskälla)."},
   mile:      {n:"Milorad Blagojević",      b:"~1900",         s:"M",c:"rs", fi:null,        mi:"stanija"},
   dimitri:   {n:"Dimitri (försvunnen)",    b:null,            s:"M",c:"rs", fi:null,        mi:"stanija"},
   egid:      {n:"Egid Ä. Lammerding",      b:"1925",d:"1944", s:"M",c:"de", fi:"willibald", mi:"trudis",
@@ -973,8 +974,12 @@ const P = {
              desc:"Jon Persson, *ca 1700 Mångstorp, Nyed, Värmland. Äldsta kända anfader i Bergman-linjen. ⚠️ Källa: MyHeritage Johnsson Family Tree (andrahandskälla)."},
 
   // ── Ellikas föräldrar + syskon ──
-  olausengene:{n:"Olaus Olsson Engene",   b:null,               s:"M",c:"svb",fi:null,        mi:null, x:"Hogdal",
-             desc:"Olaus Olsson Engene. Far till Ellika Britta Olausson. ⚠️ Källa: MyHeritage Johnsson Family Tree (andrahandskälla)."},
+  olausengene:{n:"Olaus Olsson Engene",   b:null,               s:"M",c:"svb",fi:"olauslarss", mi:"oleanacarlsd", x:"Hogdal",
+             desc:"Olaus Olsson Engene. Far till Ellika Britta Olausson. Föräldrar: Olaus Larsson *1827 + Oleana Carlsdotter *1821. ⚠️ Källa: MyHeritage Linnér Web Site (andrahandskälla)."},
+  olauslarss: {n:"Olaus Larsson",         b:"1827",             s:"M",c:"svb",fi:null,        mi:null,
+             desc:"Olaus Larsson, *1827. Far till Olaus Olsson Engene. ⚠️ Källa: MyHeritage Linnér Web Site (andrahandskälla)."},
+  oleanacarlsd:{n:"Oleana Carlsdotter",   b:"1821",             s:"F",c:"svb",fi:null,        mi:null,
+             desc:"Oleana Carlsdotter, *1821. Mor till Olaus Olsson Engene. ⚠️ Källa: MyHeritage Linnér Web Site (andrahandskälla)."},
   annacathpersd:{n:"Anna Catharina Persdotter",b:"1826-04-05",d:"1904",s:"F",c:"svb",fi:"perandskee",mi:"annaandolsd",
              desc:"Anna Catharina Persdotter, *1826-04-05 †1904. Mor till Ellika Britta Olausson. Dotter till Per Andersson och Anna Andersson f. Olsdotter (*1798-05-16 †1849-04-17, Skee). ✅ Primärkälla: FamilySearch/Riksarkivet (via Släktplatsadministratören)."},
 
@@ -1027,10 +1032,10 @@ const P = {
              desc:"Anders Strömberg, *1844 †1896. Far till Amanda Ottilia Strömberg. ⚠️ Källa: MyHeritage Johnsson Family Tree (andrahandskälla)."},
   amaliastromb:{n:"Amalia Strömberg",      b:"1849",d:"1935",   s:"F",c:"svb",fi:"hansgoran",  mi:"mariagoran",
              desc:"Amalia Strömberg, *1849 †1935. Mor till Amanda Ottilia Strömberg. ⚠️ Källa: MyHeritage Johnsson Family Tree (andrahandskälla)."},
-  hansgoran:  {n:"Hans Göransson",         b:"1807",             s:"M",c:"svb",fi:null,        mi:null,
-             desc:"Hans Göransson, *1807. Morfar till Amanda Ottilia Strömberg. ⚠️ Källa: MyHeritage Johnsson Family Tree (andrahandskälla)."},
-  mariagoran: {n:"Maria Göransson",        b:null,               s:"F",c:"svb",fi:null,        mi:null, x:"born Andersdotter",
-             desc:"Maria Göransson (born Andersdotter). Mormor till Amanda Ottilia Strömberg. ⚠️ Källa: MyHeritage Johnsson Family Tree (andrahandskälla)."},
+  hansgoran:  {n:"Hans Göransson",         b:"1807",d:"1857",    s:"M",c:"svb",fi:null,        mi:null,
+             desc:"Hans Göransson, *1807 †1857. Morfar till Amanda Ottilia Strömberg. ⚠️ Källa: Linnér family tree / MyHeritage (andrahandskälla)."},
+  mariagoran: {n:"Maria Göransson",        b:"1811",d:"1889",    s:"F",c:"svb",fi:null,        mi:null, x:"born Andersdotter",
+             desc:"Maria Göransson (born Andersdotter), *1811 †1889. Mormor till Amanda Ottilia Strömberg. ⚠️ Källa: Linnér family tree / MyHeritage (andrahandskälla)."},
 
   // ── Jan Abrahams syskon ──
   karlgustavb:{n:"Karl Gustaf Bergman",   b:"1839",d:"1921",    s:"M",c:"svb",fi:"andersabrahambg",mi:"gretajanskb",
