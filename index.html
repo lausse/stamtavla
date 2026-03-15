@@ -1673,7 +1673,7 @@ async function renderDetail(id) {
           const tp = P[pid]; if (!tp) return '';
           const tParts = (tp.n||'').split(' ');
           const tName = tParts.length >= 3 ? tParts[0] + ' ' + tParts[1] : tParts[0];
-          const yr = tp.b ? ' ' + yearOnly(tp.b) : '';
+          const yr = tp.b ? ' *' + yearOnly(tp.b) : '';
           return `<button onclick="focusPerson('${pid}')" title="${displayName(tp).replace(/"/g,'&quot;')}" class="sib sib-${tp.c||'unk'}">${tName}${yr}</button>`;
         }).join('');
         html += `<div class="det-photo-row" style="flex-direction:column;align-items:flex-start;gap:4px">
@@ -2724,7 +2724,7 @@ function render(rootId) {
           const sParts = s.n.split(' ');
           const shortName = sParts.length >= 3 ? sParts[0] + ' ' + sParts[1] : sParts[0];
           const yr = s.b ? yearOnly(s.b) : '';
-          btn.textContent = shortName + (yr ? ' ' + yr : '') + (s.d ? ' †' : '');
+          btn.textContent = shortName + (yr ? ' *' + yr : '');
           btn.title = s.n + (s.b ? ' *'+fmtDate(s.b) : '') + (s.d ? ' †'+fmtDate(s.d) : '');
           btn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -2752,8 +2752,8 @@ function render(rootId) {
           btn.className = 'child child-' + c.c;
           const cParts = c.n.split(' ');
           const firstName = cParts.length >= 3 ? cParts[0] + ' ' + cParts[1] : cParts[0];
-          const yr = c.b ? ' ' + yearOnly(c.b) : '';
-          btn.textContent = firstName + yr + (c.d ? ' †' : '');
+          const yr = c.b ? ' *' + yearOnly(c.b) : '';
+          btn.textContent = firstName + yr;
           btn.title = c.n + (c.b ? ' *'+fmtDate(c.b) : '') + (c.d ? ' †'+fmtDate(c.d) : '');
           btn.addEventListener('click', (e) => {
             e.stopPropagation();
