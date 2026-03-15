@@ -1944,7 +1944,7 @@ async function loadPhotos() {
 }
 // ════ AVATAR CROP ════
 let AVATAR_CROPS = {};
-const CROPS_LS_KEY = 'avatarCrops_v1';
+const CROPS_LS_KEY = 'avatarCrops_v2';
 
 function loadCrops() {
   try { AVATAR_CROPS = JSON.parse(localStorage.getItem(CROPS_LS_KEY)) || {}; } catch { AVATAR_CROPS = {}; }
@@ -2995,6 +2995,7 @@ window.handleCredentialResponse = async function(response) {
     isAdmin = authUser.email.toLowerCase() === LASSE_EMAIL_CLIENT;
     closeApplyModal();
     renderPhotoIndicators();
+    updateAllAvatars();
     if (isAdmin)
       document.getElementById('admin-btn').style.display = 'inline-block';
       document.getElementById('add-person-btn').style.display = 'inline-block';
