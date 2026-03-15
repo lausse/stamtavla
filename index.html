@@ -329,18 +329,28 @@ canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
 #crop-box {
   background: #fff; border-radius: 18px; padding: 22px 24px 18px;
   box-shadow: 0 8px 40px rgba(0,0,0,.3); display: flex; flex-direction: column;
-  align-items: center; gap: 14px; width: 260px;
+  align-items: center; gap: 14px; width: 270px;
 }
 #crop-box h3 { font-size: 13px; font-weight: 700; color: #333; margin: 0; text-align: center; }
-#crop-ring {
-  width: 160px; height: 160px; border-radius: 50%; overflow: hidden;
-  position: relative; cursor: grab; flex-shrink: 0;
-  box-shadow: 0 0 0 3px #ddd;
+/* Wrap: contains image + circle overlay; no overflow clip so full image is visible */
+#crop-wrap {
+  width: 220px; height: 220px; position: relative;
+  cursor: grab; flex-shrink: 0; background: #222; border-radius: 10px; overflow: hidden;
 }
-#crop-ring.dragging { cursor: grabbing; }
+#crop-wrap.dragging { cursor: grabbing; }
 #crop-img-editor {
-  position: absolute; width: 100%; height: 100%;
-  object-fit: cover; transform-origin: center; user-select: none; pointer-events: none;
+  position: absolute; transform-origin: center center;
+  user-select: none; pointer-events: none; display: block;
+}
+/* Circle indicator: dark overlay outside the crop circle via box-shadow */
+#crop-circle-indicator {
+  position: absolute;
+  width: 160px; height: 160px;
+  top: 50%; left: 50%; transform: translate(-50%, -50%);
+  border-radius: 50%;
+  box-shadow: 0 0 0 500px rgba(0,0,0,.52);
+  border: 2px solid rgba(255,255,255,.75);
+  pointer-events: none; z-index: 2;
 }
 .crop-hint { font-size: 11px; color: #aaa; text-align: center; line-height: 1.5; }
 .crop-zoom-row { display: flex; align-items: center; gap: 8px; }
@@ -616,8 +626,9 @@ canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
   <div id="crop-box">
     <h3 id="crop-title">Justera bild</h3>
     <div id="crop-photo-selector" style="display:none;flex-wrap:wrap;gap:8px;justify-content:center;max-width:220px"></div>
-    <div id="crop-ring">
+    <div id="crop-wrap">
       <img id="crop-img-editor" draggable="false">
+      <div id="crop-circle-indicator"></div>
     </div>
     <div class="crop-hint">Dra för att flytta &nbsp;·&nbsp; Scroll för att zooma</div>
     <div class="crop-zoom-row">
@@ -1484,7 +1495,7 @@ async function renderDetail(id) {
   const _photoItem = firstPhotoItem(id);
   const _c = getCrop(id);
   const _avatarHtml = _photoItem && _photoItem.isEmbed
-    ? `<div class="det-av" style="background:${col};padding:0;overflow:hidden;position:relative;${isAdmin?'cursor:pointer':''}" ${isAdmin?`onclick="openCropEditor('${id}')" title="Klicka för att justera bildutsnitt"`:''}><img src="${_photoItem.url}" style="position:absolute;width:100%;height:100%;object-fit:cover;transform-origin:center;transform:translate(${_c.x}px,${_c.y}px) scale(${_c.s});pointer-events:none"></div>`
+    ? `<div class="det-av" style="background:${col};padding:0;overflow:hidden;position:relative;${isAdmin?'cursor:pointer':''}" ${isAdmin?`onclick="openCropEditor('${id}')" title="Klicka för att justera bildutsnitt"`:''}><img src="${_photoItem.url}" style="position:absolute;width:100%;height:100%;object-fit:cover;transform-origin:center;transform:translate(${_c.x*44}px,${_c.y*44}px) scale(${_c.s});pointer-events:none"></div>`
     : _photoItem
       ? `<a href="${_photoItem.url}" target="_blank" rel="noopener" title="Öppna foto" style="display:block;text-decoration:none"><div class="det-av" style="background:${col};font-size:20px;cursor:pointer">📷</div></a>`
       : `<div class="det-av" style="background:${col}">${p.s==='F'?'♀':'♂'}</div>`;
@@ -1880,7 +1891,7 @@ function applyPhotoAvatar(av, id, p) {
     const img = document.createElement('img');
     img.src = item.url;
     img.style.cssText = 'position:absolute;width:100%;height:100%;object-fit:cover;transform-origin:center;pointer-events:none;user-select:none';
-    applyCropToImg(img, id);
+    applyCropToImg(img, id, 28);
     av.appendChild(img);
     if (isAdmin) {
       av.classList.add('has-photo', 'is-admin');
@@ -1949,138 +1960,153 @@ function persistCrops() {
   try { localStorage.setItem(CROPS_LS_KEY, JSON.stringify(AVATAR_CROPS)); } catch {}
   if (db && isAdmin) db.collection('settings').doc('avatarCrops').set(AVATAR_CROPS).catch(() => {});
 }
+const CROP_CIRCLE = 160;
+const CROP_WRAP   = 220;
+
 function getCrop(id) { return AVATAR_CROPS[id] || {x: 0, y: 0, s: 1}; }
-function applyCropToImg(img, id) {
+function applyCropToImg(img, id, size) {
   const c = getCrop(id);
-  img.style.transform = `translate(${c.x}px,${c.y}px) scale(${c.s})`;
+  const sz = size || 28;
+  img.style.transform = `translate(${c.x * sz}px,${c.y * sz}px) scale(${c.s})`;
 }
 
-// Crop editor state
-let _cropId = null, _cropX = 0, _cropY = 0, _cropS = 1, _cropUrl = null;
+// Crop editor state (_editorX/Y in editor-px; stored as fractions on save)
+let _cropId = null, _editorX = 0, _editorY = 0, _editorS = 1, _cropUrl = null;
 let _cropDragging = false, _cropDragSX = 0, _cropDragSY = 0, _cropDragX0 = 0, _cropDragY0 = 0;
+
+function _setupEditorImage(img, url, savedXFrac, savedYFrac, savedS) {
+  img.onload = () => {
+    const W = img.naturalWidth, H = img.naturalHeight;
+    const coverScale = CROP_CIRCLE / Math.min(W, H);
+    const dW = W * coverScale, dH = H * coverScale;
+    img.style.width  = dW + 'px';
+    img.style.height = dH + 'px';
+    img.style.left   = ((CROP_WRAP - dW) / 2) + 'px';
+    img.style.top    = ((CROP_WRAP - dH) / 2) + 'px';
+    if (savedXFrac !== undefined) {
+      _editorX = savedXFrac * CROP_CIRCLE;
+      _editorY = savedYFrac * CROP_CIRCLE;
+      _editorS = savedS;
+    } else {
+      // Auto-fit: scale so full image is visible in the wrap canvas
+      _editorX = 0; _editorY = 0;
+      _editorS = Math.min(CROP_WRAP / dW, CROP_WRAP / dH);
+    }
+    cropApplyEditor();
+  };
+  img.src = url;
+}
 
 function cropSelectPhoto(url) {
   _cropUrl = url;
-  _cropX = 0; _cropY = 0; _cropS = 1;
-  const img = document.getElementById('crop-img-editor');
-  img.src = url;
-  cropApplyEditor();
-  // Highlight selected thumb
   document.querySelectorAll('.crop-thumb').forEach(el => {
     el.style.outline = el.dataset.url === url ? '2px solid #5ab6e0' : '2px solid transparent';
   });
+  const isEmbed = url && (url.startsWith('data:') || url.includes('googleusercontent.com'));
+  document.getElementById('crop-wrap').style.display    = isEmbed ? '' : 'none';
+  document.querySelector('.crop-hint').style.display    = isEmbed ? '' : 'none';
+  document.querySelector('.crop-zoom-row').style.display = isEmbed ? '' : 'none';
+  if (isEmbed) _setupEditorImage(document.getElementById('crop-img-editor'), url);
 }
 
 function openCropEditor(id) {
   const items = PHOTOS[id] || [];
   if (!items.length) return;
   _cropId = id;
-  const c = getCrop(id);
-  _cropX = c.x; _cropY = c.y; _cropS = c.s;
-  _cropUrl = (c.photo) || (typeof items[0] === 'string' ? items[0] : items[0].url);
+  const saved = getCrop(id);
+  _cropUrl = (saved.photo) || (typeof items[0] === 'string' ? items[0] : items[0].url);
   const p = P[id];
   document.getElementById('crop-title').textContent = p ? p.n : id;
 
-  // Build photo selector
   const sel = document.getElementById('crop-photo-selector');
   sel.innerHTML = '';
-  if (items.length > 1) {
-    sel.style.display = 'flex';
-    items.forEach((item, i) => {
-      const url = typeof item === 'string' ? item : item.url;
-      const label = typeof item === 'object' && item.text ? item.text : `Foto ${i + 1}`;
-      const isEmbed = url && (url.startsWith('data:') || url.includes('googleusercontent.com'));
-      const thumb = document.createElement('div');
-      thumb.className = 'crop-thumb';
-      thumb.dataset.url = url;
-      thumb.title = label;
-      thumb.style.cssText = `width:40px;height:40px;border-radius:50%;overflow:hidden;flex-shrink:0;cursor:pointer;
-        outline:${url === _cropUrl ? '2px solid #5ab6e0' : '2px solid transparent'};outline-offset:2px;
-        background:#eee;display:flex;align-items:center;justify-content:center;font-size:16px`;
-      if (isEmbed) {
-        const img = document.createElement('img');
-        img.src = url;
-        img.style.cssText = 'width:100%;height:100%;object-fit:cover';
-        thumb.appendChild(img);
-      } else {
-        thumb.textContent = '📷';
-      }
-      thumb.onclick = () => cropSelectPhoto(url);
-      sel.appendChild(thumb);
-    });
-  } else {
-    sel.style.display = 'none';
-  }
+  sel.style.display = items.length > 1 ? 'flex' : 'none';
+  items.forEach((item, i) => {
+    const url   = typeof item === 'string' ? item : item.url;
+    const label = typeof item === 'object' && item.text ? item.text : `Foto ${i + 1}`;
+    const isEmbed = url && (url.startsWith('data:') || url.includes('googleusercontent.com'));
+    const thumb = document.createElement('div');
+    thumb.className = 'crop-thumb';
+    thumb.dataset.url = url;
+    thumb.title = label;
+    thumb.style.cssText = `width:40px;height:40px;border-radius:50%;overflow:hidden;flex-shrink:0;
+      cursor:pointer;background:#eee;display:flex;align-items:center;justify-content:center;font-size:16px;
+      outline:${url === _cropUrl ? '2px solid #5ab6e0' : '2px solid transparent'};outline-offset:2px`;
+    if (isEmbed) {
+      const tImg = document.createElement('img');
+      tImg.src = url; tImg.style.cssText = 'width:100%;height:100%;object-fit:cover';
+      thumb.appendChild(tImg);
+    } else { thumb.textContent = '📷'; }
+    thumb.onclick = () => cropSelectPhoto(url);
+    sel.appendChild(thumb);
+  });
 
-  const img = document.getElementById('crop-img-editor');
   const isEmbed = _cropUrl && (_cropUrl.startsWith('data:') || _cropUrl.includes('googleusercontent.com'));
-  document.getElementById('crop-ring').style.display = isEmbed ? '' : 'none';
-  document.querySelector('.crop-hint').style.display = isEmbed ? '' : 'none';
+  document.getElementById('crop-wrap').style.display    = isEmbed ? '' : 'none';
+  document.querySelector('.crop-hint').style.display    = isEmbed ? '' : 'none';
   document.querySelector('.crop-zoom-row').style.display = isEmbed ? '' : 'none';
-  if (isEmbed) { img.src = _cropUrl; cropApplyEditor(); }
+  if (isEmbed) _setupEditorImage(document.getElementById('crop-img-editor'), _cropUrl,
+    saved.x, saved.y, saved.s);
   updateCropZoomLabel();
   document.getElementById('crop-modal').style.display = 'flex';
 }
+
 function cropClose() { document.getElementById('crop-modal').style.display = 'none'; _cropId = null; }
-function cropReset() { _cropX = 0; _cropY = 0; _cropS = 1; cropApplyEditor(); }
+function cropReset() { _editorX = 0; _editorY = 0; _editorS = 1; cropApplyEditor(); }
 function cropZoom(delta) {
-  _cropS = Math.min(4, Math.max(0.5, +(_cropS + delta).toFixed(2)));
+  _editorS = Math.min(5, Math.max(0.1, +(_editorS + delta).toFixed(3)));
   cropApplyEditor();
 }
 function cropApplyEditor() {
   const img = document.getElementById('crop-img-editor');
-  img.style.transform = `translate(${_cropX}px,${_cropY}px) scale(${_cropS})`;
+  img.style.transform = `translate(${_editorX}px,${_editorY}px) scale(${_editorS})`;
   updateCropZoomLabel();
 }
 function updateCropZoomLabel() {
-  document.getElementById('crop-zoom-label').textContent = Math.round(_cropS * 100) + '%';
+  document.getElementById('crop-zoom-label').textContent = Math.round(_editorS * 100) + '%';
 }
 async function cropSave() {
   if (!_cropId) return;
-  AVATAR_CROPS[_cropId] = {x: _cropX, y: _cropY, s: _cropS, photo: _cropUrl};
+  AVATAR_CROPS[_cropId] = {x: _editorX / CROP_CIRCLE, y: _editorY / CROP_CIRCLE, s: _editorS, photo: _cropUrl};
   persistCrops();
   updateAllAvatars();
   renderDetail(_cropId);
   cropClose();
 }
 
-// Drag events on crop ring
 document.addEventListener('DOMContentLoaded', () => {
-  const ring = document.getElementById('crop-ring');
-  ring.addEventListener('mousedown', e => {
-    _cropDragging = true; ring.classList.add('dragging');
+  const wrap = document.getElementById('crop-wrap');
+  wrap.addEventListener('mousedown', e => {
+    _cropDragging = true; wrap.classList.add('dragging');
     _cropDragSX = e.clientX; _cropDragSY = e.clientY;
-    _cropDragX0 = _cropX; _cropDragY0 = _cropY;
+    _cropDragX0 = _editorX; _cropDragY0 = _editorY;
     e.preventDefault();
   });
   document.addEventListener('mousemove', e => {
     if (!_cropDragging) return;
-    _cropX = _cropDragX0 + (e.clientX - _cropDragSX);
-    _cropY = _cropDragY0 + (e.clientY - _cropDragSY);
+    _editorX = _cropDragX0 + (e.clientX - _cropDragSX);
+    _editorY = _cropDragY0 + (e.clientY - _cropDragSY);
     cropApplyEditor();
   });
-  document.addEventListener('mouseup', () => { _cropDragging = false; document.getElementById('crop-ring').classList.remove('dragging'); });
-  // Touch support
-  ring.addEventListener('touchstart', e => {
-    const t = e.touches[0];
-    _cropDragging = true; _cropDragSX = t.clientX; _cropDragSY = t.clientY;
-    _cropDragX0 = _cropX; _cropDragY0 = _cropY;
+  document.addEventListener('mouseup', () => { _cropDragging = false; wrap.classList.remove('dragging'); });
+  wrap.addEventListener('touchstart', e => {
+    const t = e.touches[0]; _cropDragging = true;
+    _cropDragSX = t.clientX; _cropDragSY = t.clientY;
+    _cropDragX0 = _editorX; _cropDragY0 = _editorY;
     e.preventDefault();
   }, {passive: false});
   document.addEventListener('touchmove', e => {
     if (!_cropDragging) return;
     const t = e.touches[0];
-    _cropX = _cropDragX0 + (t.clientX - _cropDragSX);
-    _cropY = _cropDragY0 + (t.clientY - _cropDragSY);
+    _editorX = _cropDragX0 + (t.clientX - _cropDragSX);
+    _editorY = _cropDragY0 + (t.clientY - _cropDragSY);
     cropApplyEditor();
   }, {passive: true});
   document.addEventListener('touchend', () => { _cropDragging = false; });
-  // Scroll to zoom
-  ring.addEventListener('wheel', e => {
+  wrap.addEventListener('wheel', e => {
     e.preventDefault();
     cropZoom(e.deltaY < 0 ? 0.05 : -0.05);
   }, {passive: false});
-  // Close on backdrop click
   document.getElementById('crop-modal').addEventListener('click', e => {
     if (e.target === document.getElementById('crop-modal')) cropClose();
   });
