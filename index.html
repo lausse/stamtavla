@@ -1700,9 +1700,9 @@ async function renderDetail(id) {
       const c = getCrop(avid), sz = 44;
       const img = document.createElement('img');
       img.style.cssText = 'position:absolute;pointer-events:none;user-select:none';
-      img.onload = function() { positionCropImgEl(this, c, sz); };
+      img.onload = function() { positionCropImgEl(this, getCrop(avid), sz); };
       img.src = phItem.url;
-      if (img.complete && img.naturalWidth) positionCropImgEl(img, c, sz);
+      if (img.complete && img.naturalWidth) positionCropImgEl(img, getCrop(avid), sz);
       av.appendChild(img);
     }
   });
@@ -1905,9 +1905,9 @@ function applyPhotoAvatar(av, id, p) {
     const sz = 28;
     const img = document.createElement('img');
     img.style.cssText = 'position:absolute;pointer-events:none;user-select:none';
-    img.onload = function() { positionCropImgEl(this, c, sz); };
+    img.onload = function() { positionCropImgEl(this, getCrop(id), sz); };
     img.src = item.url;
-    if (img.complete && img.naturalWidth) positionCropImgEl(img, c, sz);
+    if (img.complete && img.naturalWidth) positionCropImgEl(img, getCrop(id), sz);
     av.appendChild(img);
     if (isAdmin) {
       av.classList.add('has-photo', 'is-admin');
@@ -1934,6 +1934,12 @@ function updateAllAvatars() {
   document.querySelectorAll('.av[data-avid]').forEach(av => {
     const id = av.dataset.avid;
     if (P[id]) applyPhotoAvatar(av, id, P[id]);
+  });
+  // Re-apply crop to det-av photos already in the DOM (e.g. after Firebase crops load)
+  document.querySelectorAll('[data-detavid]').forEach(av => {
+    const avid = av.dataset.detavid;
+    const img = av.querySelector('img');
+    if (img && img.complete && img.naturalWidth) positionCropImgEl(img, getCrop(avid), 44);
   });
 }
 
