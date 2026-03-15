@@ -450,12 +450,16 @@ canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
       <h2>📋 Bildarkiv — ansökningar</h2>
       <button id="admin-head-close" onclick="closeAdminPanel()">✕</button>
     </div>
-    <div style="padding:8px 16px;border-bottom:1px solid #eee;display:flex;align-items:center;gap:10px">
+    <div style="padding:8px 16px;border-bottom:1px solid #eee;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <button id="migrate-photos-btn" onclick="migratePhotoUrls()"
         style="font-size:11px;padding:4px 12px;background:#4a90d9;color:#fff;border:none;border-radius:6px;cursor:pointer">
         🔄 Lös Google Photos-URL:er
       </button>
       <span style="font-size:10px;color:#aaa">Konverterar sparade goo.gl-länkar till direktbilder</span>
+      <button onclick="exportGEDCOM()"
+        style="font-size:11px;padding:4px 12px;background:#5a7a4a;color:#fff;border:none;border-radius:6px;cursor:pointer;margin-left:auto">
+        ⬇ Exportera GEDCOM
+      </button>
     </div>
     <div id="admin-body">
       <div class="admin-empty">Laddar…</div>
@@ -2832,6 +2836,88 @@ async function openAdminPanel() {
 
 function closeAdminPanel() {
   document.getElementById('admin-modal').style.display = 'none';
+}
+
+function exportGEDCOM() {
+  const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  const now = new Date();
+  const today = `${now.getDate()} ${MONTHS[now.getMonth()]} ${now.getFullYear()}`;
+
+  function toGedDate(d) {
+    if (!d) return null;
+    d = String(d).trim();
+    if (d.startsWith('~')) return 'ABT ' + d.slice(1);
+    const full = d.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+    if (full) return `${parseInt(full[1])} ${MONTHS[parseInt(full[2])-1]} ${full[3]}`;
+    if (/^\d{4}$/.test(d)) return d;
+    return d;
+  }
+
+  const lines = [];
+  lines.push('0 HEAD');
+  lines.push('1 SOUR Stamtavla');
+  lines.push('2 NAME Lasses Släktforskning');
+  lines.push('2 VERS 1.0');
+  lines.push('1 DATE ' + today);
+  lines.push('1 SUBM @SUBM1@');
+  lines.push('1 GEDC');
+  lines.push('2 VERS 5.5.1');
+  lines.push('2 FORM LINEAGE-LINKED');
+  lines.push('1 CHAR UTF-8');
+  lines.push('1 LANG Swedish');
+  lines.push('0 @SUBM1@ SUBM');
+  lines.push('1 NAME Lasse Nilsson');
+
+  // Build family map keyed on "fi|mi"
+  const famMap = {};
+  const ids = Object.keys(P);
+  ids.forEach(id => {
+    const p = P[id];
+    if (!p.fi && !p.mi) return;
+    const key = (p.fi || '') + '|' + (p.mi || '');
+    if (!famMap[key]) famMap[key] = { husb: p.fi || null, wife: p.mi || null, children: [] };
+    famMap[key].children.push(id);
+  });
+  const famKeys = Object.keys(famMap);
+
+  // INDI records
+  ids.forEach(id => {
+    const p = P[id];
+    lines.push('0 @I' + id + '@ INDI');
+    lines.push('1 NAME ' + p.n);
+    if (p.s) lines.push('1 SEX ' + p.s);
+    const bd = toGedDate(p.b);
+    if (bd) { lines.push('1 BIRT'); lines.push('2 DATE ' + bd); }
+    const dd = toGedDate(p.d);
+    if (dd) { lines.push('1 DEAT'); lines.push('2 DATE ' + dd); }
+    else if (p.d) lines.push('1 DEAT');
+    const note = [p.desc, p.x].filter(Boolean).join(' | ').replace(/\n/g,' ');
+    if (note) lines.push('1 NOTE ' + note);
+    if (p.fi || p.mi) lines.push('1 FAMC @F' + (p.fi||'') + '|' + (p.mi||'') + '@');
+    famKeys.forEach(key => {
+      const f = famMap[key];
+      if (f.husb === id || f.wife === id) lines.push('1 FAMS @F' + key + '@');
+    });
+  });
+
+  // FAM records
+  famKeys.forEach(key => {
+    const f = famMap[key];
+    lines.push('0 @F' + key + '@ FAM');
+    if (f.husb) lines.push('1 HUSB @I' + f.husb + '@');
+    if (f.wife) lines.push('1 WIFE @I' + f.wife + '@');
+    f.children.forEach(c => lines.push('1 CHIL @I' + c + '@'));
+  });
+
+  lines.push('0 TRLR');
+
+  const blob = new Blob([lines.join('\r\n')], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'stamtavla_' + today.replace(/ /g,'_') + '.ged';
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function renderAdminRows(rows) {
