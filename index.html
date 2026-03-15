@@ -1407,10 +1407,12 @@ async function renderDetail(id) {
   let html = '';
 
   // Header — avatar: foto om tillgängligt, annars könssymbol
-  const _avatarUrl = firstEmbedUrl(id);
-  const _avatarHtml = _avatarUrl
-    ? `<div class="det-av" style="background:${col};padding:0;overflow:hidden"><img src="${_avatarUrl}" style="width:100%;height:100%;object-fit:cover;object-position:center 15%;border-radius:50%;display:block"></div>`
-    : `<div class="det-av" style="background:${col}">${p.s==='F'?'♀':'♂'}</div>`;
+  const _photoItem = firstPhotoItem(id);
+  const _avatarHtml = _photoItem && _photoItem.isEmbed
+    ? `<div class="det-av" style="background:${col};padding:0;overflow:hidden"><img src="${_photoItem.url}" style="width:100%;height:100%;object-fit:cover;object-position:center 15%;border-radius:50%;display:block"></div>`
+    : _photoItem
+      ? `<a href="${_photoItem.url}" target="_blank" rel="noopener" title="Öppna foto" style="display:block;text-decoration:none"><div class="det-av" style="background:${col};font-size:20px;cursor:pointer">📷</div></a>`
+      : `<div class="det-av" style="background:${col}">${p.s==='F'?'♀':'♂'}</div>`;
 
   html += `<div class="det-head" style="background:${col}18; border-left:4px solid ${col}">
     ${_avatarHtml}
@@ -1778,30 +1780,42 @@ function showToast(msg, ms = 3000) {
 // ════ FOTO — laddas från Apps Script (Sheet) med fallback till photos.json ════
 let PHOTOS = {};
 
-function firstEmbedUrl(id) {
+function firstPhotoItem(id) {
   if (!(isAdmin || approved)) return null;
   const items = PHOTOS[id] || [];
-  const found = items.find(item => {
-    const u = typeof item === 'string' ? item : item.url;
-    return u && (u.startsWith('data:') || u.includes('googleusercontent.com'));
-  });
-  return found ? (typeof found === 'string' ? found : found.url) : null;
+  if (!items.length) return null;
+  const first = items[0];
+  const url = typeof first === 'string' ? first : first.url;
+  if (!url) return null;
+  const isEmbed = url.startsWith('data:') || url.includes('googleusercontent.com');
+  return { url, isEmbed };
+}
+
+function firstEmbedUrl(id) {
+  const item = firstPhotoItem(id);
+  return (item && item.isEmbed) ? item.url : null;
 }
 
 function applyPhotoAvatar(av, id, p) {
-  const url = firstEmbedUrl(id);
-  if (url) {
+  const item = firstPhotoItem(id);
+  if (item && item.isEmbed) {
     av.textContent = '';
-    av.style.padding = '0';
-    av.style.overflow = 'hidden';
+    av.style.cssText = 'padding:0;overflow:hidden;cursor:default';
     const img = document.createElement('img');
-    img.src = url;
+    img.src = item.url;
     img.style.cssText = 'width:100%;height:100%;object-fit:cover;object-position:center 15%;border-radius:50%;display:block';
     av.appendChild(img);
+  } else if (item) {
+    av.textContent = '📷';
+    av.style.cssText = 'font-size:14px;cursor:pointer';
+    av.title = 'Öppna foto';
+    av.onclick = e => { e.stopPropagation(); window.open(item.url, '_blank', 'noopener'); };
   } else {
+    av.innerHTML = '';
     av.textContent = p.s === 'F' ? '♀' : '♂';
-    av.style.padding = '';
-    av.style.overflow = '';
+    av.style.cssText = '';
+    av.title = '';
+    av.onclick = null;
   }
 }
 
