@@ -1011,9 +1011,28 @@ const P = {
   trudis:    {n:"Gertrud Schräder",        b:"1896",d:"1977", s:"F",c:"de", fi:"josefb",    mi:"mkcordes"},
   toza:      {n:"Toza Blagojević",         b:null,            s:"M",c:"rs", fi:"jovanovic", mi:null,  x:"Niš"},
   dunja:     {n:"Dunja",                   b:null,            s:"F",c:"rs", fi:"jovanovic", mi:null,  x:"Belgrad"},
+  // Toza Blagojevics familj
+  budda_t:   {n:"Budda",                   b:null,            s:"F",c:"rs", fi:null,        mi:null},
+  mile_t:    {n:"Milorad Blagojević",      b:null,            s:"M",c:"rs", fi:"toza",      mi:"budda_t",  x:"Niš"},
+  ljubica_t: {n:"Ljubica",                 b:null,            s:"F",c:"rs", fi:null,        mi:null},
+  nadija:    {n:"Nadija",                  b:null,            s:"F",c:"rs", fi:"mile_t",    mi:"ljubica_t"},
+  lilijana:  {n:"Lilijana",                b:null,            s:"F",c:"rs", fi:"mile_t",    mi:"ljubica_t"},
+  // Dunjas familj
+  dusko:     {n:"Duško",                   b:null,            s:"M",c:"rs", fi:null,        mi:"dunja",    x:"Dalmatien"},
+  mirjana:   {n:"Mirjana",                 b:null,            s:"F",c:"rs", fi:null,        mi:null},
+  lubica:    {n:"Lubica",                  b:null,            s:"F",c:"rs", fi:"dusko",     mi:"mirjana"},
+  jelena_d:  {n:"Jelena",                  b:null,            s:"F",c:"rs", fi:"dusko",     mi:"mirjana"},
   mathildes: {n:"Mathilde Schräder",       b:"1887",          s:"F",c:"de", fi:"josefb",    mi:"mkcordes"},
   franzs:    {n:"Franz Schräder",          b:"1889",          s:"M",c:"de", fi:"josefb",    mi:"mkcordes"},
   marias:    {n:"Maria Schräder",          b:"1894",          s:"F",c:"de", fi:"josefb",    mi:"mkcordes", x:"T4?"},
+  // Josef Schräders barn ur 2:a äktenskapet (modern okänd)
+  josefs_jr:{n:"Josef Schräder jr.",    b:null,             s:"M",c:"de", fi:"josefb",    mi:null,        x:"Bonn"},
+  klarchen:  {n:"Klärchen",              b:null,             s:"F",c:"de", fi:null,        mi:null},
+  ulla_s:    {n:"Ulla",                  b:null,             s:"F",c:"de", fi:"josefs_jr", mi:"klarchen"},
+  horst_s:   {n:"Horst",                 b:null,             s:"M",c:"de", fi:"josefs_jr", mi:"klarchen"},
+  alberts:   {n:"Albert Schräder",       b:null,             s:"M",c:"de", fi:"josefb",    mi:null},
+  margarete_s:{n:"Margarete",            b:null,             s:"F",c:"de", fi:null,        mi:null},
+  heinz_s:   {n:"Heinz",                 b:null,             s:"M",c:"de", fi:"alberts",   mi:"margarete_s"},
   alfred:    {n:"Alfred Bergman",          b:"1863-02-20",d:"1942-12-05",s:"M",c:"svb",fi:"janabrahambg",mi:"annalisaandsd",  x:"Lysekil"},
   amanda:    {n:"Amanda Ottilia Strömberg",b:"1868-05-04",d:"1932-02-02",s:"F",c:"svb",fi:"andersstromb",mi:"amaliastromb",
              desc:"Amanda Ottilia Strömberg, *4.5.1868 Skee, Bohuslän †2.2.1932 Lysekil. Gift med Alfred Bergman 19.4.1886. Arbeterska. Far: Anders Strömberg (*1844 †1896). Mor: Amalia Strömberg (*1849 †1935). ⚠️ Källa: MyHeritage Johnsson Family Tree (andrahandskälla)."},
@@ -1244,8 +1263,14 @@ const P = {
   ute_l:    {n:"Ute",                 b:"1966", s:"F", c:"de",  fi:"franzl",  mi:null},
   elke_l:   {n:"Elke",                b:"1966", s:"F", c:"de",  fi:"franzl",  mi:null},
   stefan_l: {n:"Stefan",              b:"1967", s:"M", c:"de",  fi:"franzl",  mi:null},
-  // Gertrud Lammerdings son
-  udo:      {n:"Udo Schubert",        b:"1963", s:"M", c:"de",  fi:null,      mi:"gertrudl"},
+  // Gertrud Lammerdings son + barnbarn
+  erwin_s:  {n:"Erwin Schubert",         b:null,         s:"M",c:"de", fi:null,        mi:null,        x:"Breslau"},
+  udo:      {n:"Udo Schubert",           b:"1963",       s:"M",c:"de", fi:"erwin_s",   mi:"gertrudl"},
+  manuela_s:{n:"Manuela Schubert",       b:"1965-10-16", s:"F",c:"de", fi:null,        mi:null},
+  annalena_s:{n:"Anna-Lena Schubert",   b:"1994-10-18", s:"F",c:"de", fi:"udo",       mi:"manuela_s"},
+  lucas_s:  {n:"Lucas Schubert",         b:"1996-08-29", s:"M",c:"de", fi:"udo",       mi:"manuela_s"},
+  evalotta_s:{n:"Eva-Lotta Schubert",   b:"2001-04-19", s:"F",c:"de", fi:"udo",       mi:"manuela_s"},
+  frederik_s:{n:"Frederik Schubert",    b:"2003-05-15", s:"M",c:"de", fi:"udo",       mi:"manuela_s"},
   mkteves:   {n:"Maria K. Teves",          b:null,            s:"F",c:"de", fi:null,        mi:null},
 
   // ── Gustaf Hindrik Gustafssons övriga barn (utöver fransgg och oskarfg) ──
@@ -1272,6 +1297,11 @@ const P = {
   andersgustafa:{n:"Anders Gustaf Andersson",  b:"1865", s:"M",c:"sv", fi:"andersandersson", mi:"heddasofia",
                  desc:"Anders Gustaf Andersson, *2.1.1865 Mjölby. Son till Anders Andersson och Hedda Sofia Nilsdotter. Gift med Emilia Julia f. Andersson (*1865 Regna). Hemort 1930: Mjölby (Rödinng 01). Barn 1930: dotter Emmy Emerentis *1895 (hemma), son Gustaf *1910 (hemma, sågverksarb.), dotter May Gunborg Elisabet *1923 (hemma). Ca 5 döttrar utflyttade. Troligen 1 son totalt. ✅ HFL AI:29 sid.347 + FK 1930 (B0001074_00441 sida 131).",
                  desc_de:"Anders Gustaf Andersson, *2.1.1865 Mjölby. Verheiratet mit Emilia Julia Andersson (*1865 Regna). 1930: Mjölby. Kinder: Tochter *1895, Sohn Gustaf *1910, Tochter *1923. ✅ FK 1930."},
+  // Anders Gustafs familj
+  emilia_ag: {n:"Emilia Julia Andersson",  b:"1865",           s:"F",c:"sv", fi:null, mi:null, x:"Regna"},
+  emmy_ag:   {n:"Emmy Emerentis Andersson",b:"1895",           s:"F",c:"sv", fi:"andersgustafa", mi:"emilia_ag"},
+  gustaf_ag: {n:"Gustaf Andersson",        b:"1910",           s:"M",c:"sv", fi:"andersgustafa", mi:"emilia_ag"},
+  may_ag:    {n:"May Gunborg Andersson",   b:"1923",           s:"F",c:"sv", fi:"andersgustafa", mi:"emilia_ag"},
   hildamariaa:  {n:"Hilda Maria Andersson",    b:"1868-11-19", s:"F",c:"sv", fi:"andersandersson", mi:"heddasofia",
                  desc:"Hilda Maria Andersson, *19.11.1868 Mjölby. Dotter till Anders Andersson och Hedda Sofia Nilsdotter. Ogift 1930 — bor hos en Nilsson-bondgård, inga egna barn. ✅ Dopbok CI:4 bild 32 sid 51 rad 52 + HFL AI:29 sid.347 + FK 1930.",
                  desc_de:"Hilda Maria Andersson, *19.11.1868 Mjölby. Ledig 1930, wohnt bei Bauernfamilie Nilsson, keine Kinder. ✅ Taufbuch CI:4 Bild 32 + HFL AI:29 S.347 + FK 1930."},
