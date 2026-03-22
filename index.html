@@ -474,7 +474,8 @@ canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
 
   /* ─ Zoom-knappar — större tryckyta ─ */
   .zoom-btn { width: 46px; height: 46px; font-size: 26px; }
-  #zoom-controls { bottom: 14px; }
+  #zoom-controls { bottom: 14px; transition: bottom .3s ease; }
+  #zoom-controls.panel-open { bottom: calc(65vh + 14px); }
 
   /* ─ Admin-panel — bottom sheet ─ */
   #admin-modal {
@@ -498,6 +499,11 @@ canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
   /* ─ Ansökningsmodal ─ */
   #apply-box { padding: 20px 16px 16px; }
   #apply-box h2 { font-size: 15px; }
+}
+
+@media (max-width: 640px) and (orientation: landscape) {
+  #detail { max-height: 50vh; }
+  #zoom-controls.panel-open { bottom: calc(50vh + 14px); }
 }
 </style>
 </head>
@@ -1529,13 +1535,37 @@ const detBackdrop = document.getElementById('det-backdrop');
 
 function showDetailPanel() {
   detPanel.classList.remove('collapsed');
-  if (window.innerWidth <= 640) detBackdrop.classList.add('visible');
+  if (window.innerWidth <= 640) {
+    detBackdrop.classList.add('visible');
+    document.getElementById('zoom-controls').classList.add('panel-open');
+  }
 }
 function closeDetailPanel() {
   detPanel.classList.add('collapsed');
   detBackdrop.classList.remove('visible');
+  document.getElementById('zoom-controls').classList.remove('panel-open');
+  detPanel.style.transform = '';
 }
 detBackdrop.addEventListener('click', closeDetailPanel);
+
+// ── Swipe-to-dismiss på bottom sheet ──
+let sheetDragY0 = null;
+detPanel.addEventListener('touchstart', e => {
+  const rect = detPanel.getBoundingClientRect();
+  if (e.touches[0].clientY - rect.top < 44) sheetDragY0 = e.touches[0].clientY;
+}, { passive: true });
+detPanel.addEventListener('touchmove', e => {
+  if (sheetDragY0 === null) return;
+  const dy = e.touches[0].clientY - sheetDragY0;
+  if (dy > 0) detPanel.style.transform = `translateY(${dy}px)`;
+}, { passive: true });
+detPanel.addEventListener('touchend', e => {
+  if (sheetDragY0 === null) return;
+  const dy = e.changedTouches[0].clientY - sheetDragY0;
+  detPanel.style.transform = '';
+  if (dy > 80) closeDetailPanel();
+  sheetDragY0 = null;
+});
 
 async function renderDetail(id) {
   showDetailPanel();
@@ -2998,6 +3028,15 @@ document.getElementById('zoom-out').addEventListener('click', () => {
   zoom = Math.max(0.3, zoom - 0.15); applyZoom();
 });
 
+function fitToMobile() {
+  if (window.innerWidth > 640) return;
+  const wrapW = parseFloat(wrap.style.width) || 0;
+  if (!wrapW) return;
+  const vw = viewport.clientWidth;
+  zoom = Math.max(0.25, Math.min(1.0, (vw - 20) / wrapW));
+  applyZoom();
+}
+
 // ── Mushjul = zoom centrerat på muspekaren (som Riksarkivet) ──
 viewport.addEventListener('wheel', e => {
   e.preventDefault();
@@ -3810,6 +3849,7 @@ document.getElementById('apply-modal').addEventListener('click', function(e) {
 
 // ════ INIT ════
 render(currentRoot);
+fitToMobile();
 renderDetail(currentRoot);
 
 // Starta GIS så fort biblioteket är laddat — hanterar auto-login för återvändande användare
