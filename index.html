@@ -1603,7 +1603,20 @@ async function renderDetail(id) {
   html += `<div class="det-head" style="background:${col}18; border-left:4px solid ${col}">
     ${_avatarHtml}
     <div style="flex:1;min-width:0">
-      <div class="det-name">${displayName(p)}${p.nick ? ` <span style="font-size:11px;font-weight:400;color:#888">(${p.nick})</span>` : ''}</div>
+      <div class="det-name">${(()=>{
+        const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        const base = displayName(p);
+        if (!p.till) return esc(base) + (p.nick ? ` <span style="font-size:11px;font-weight:400;color:#888">(${esc(p.nick)})</span>` : '');
+        const tillSet = new Set(p.till.toLowerCase().split(/\s+/).filter(Boolean));
+        const words = base.split(' ');
+        const html = words.map((w, i) => {
+          const isLast = i === words.length - 1;
+          return (isLast || tillSet.has(w.toLowerCase()))
+            ? esc(w)
+            : `<span style="font-weight:400;color:#aaa">${esc(w)}</span>`;
+        }).join(' ');
+        return html + (p.nick ? ` <span style="font-size:11px;font-weight:400;color:#888">(${esc(p.nick)})</span>` : '');
+      })()}</div>
       <div class="det-dates">${p.b?'*'+fmtDate(p.b):''}${p.b&&p.d?'&ensp;':''}${p.d?'†'+fmtDate(p.d):''}</div>
     </div>
     <button id="det-close" title="Stäng">×</button>
@@ -1661,6 +1674,11 @@ async function renderDetail(id) {
             <input id="det-edit-nick" type="text" value="${(p.nick||'').replace(/"/g,'&quot;')}" placeholder="t.ex. Kalle"
               style="width:100%;font-size:12px;padding:4px 6px;border:1px solid #ddd;border-radius:6px">
           </div>
+        </div>
+        <div style="margin-bottom:8px">
+          <div style="font-size:11px;color:#aaa;margin-bottom:3px">Tilltalsnamn <span style="font-weight:400">(mellannamn utanför listas svagare)</span></div>
+          <input id="det-edit-till" type="text" value="${(p.till||'').replace(/"/g,'&quot;')}" placeholder="t.ex. Carl Nilsson"
+            style="width:100%;font-size:12px;padding:4px 6px;border:1px solid #ddd;border-radius:6px">
         </div>
         <div style="display:flex;gap:8px;margin-bottom:8px">
           <div style="flex:1">
@@ -1882,6 +1900,7 @@ window.doSavePerson = async function(id) {
   const md   = (document.getElementById('det-edit-md')?.value || '').trim();
   const name = (document.getElementById('det-edit-name')?.value || '').trim();
   const nick = (document.getElementById('det-edit-nick')?.value || '').trim();
+  const till = (document.getElementById('det-edit-till')?.value || '').trim();
 
   // Spara text + datum + namn + smeknamn
   const data = { descSv: sv, descDe: de, descEn: en };
@@ -1890,6 +1909,7 @@ window.doSavePerson = async function(id) {
   if (md) data.md = md; else data.md = null;
   if (name) data.name = name;
   data.nick = nick || null;
+  data.till = till || null;
   await db.collection('persons').doc(id).set(data, { merge: true });
   if (P[id]) {
     if (sv) P[id].desc = sv;
@@ -1897,6 +1917,7 @@ window.doSavePerson = async function(id) {
     if (en) P[id].desc_en = en;
     if (name) P[id].n = name;
     P[id].nick = nick || null;
+    P[id].till = till || null;
     if (b) P[id].b = b;
     if (d) P[id].d = d;
     if (md) P[id].md = md; else delete P[id].md;
@@ -2357,6 +2378,7 @@ async function loadPersonsFromFirestore() {
       if (d.descEn) P[id].desc_en = d.descEn;
       if (d.name) P[id].n = d.name;
       if (d.nick !== undefined) P[id].nick = d.nick || null;
+      if (d.till !== undefined) P[id].till = d.till || null;
       if (d.b)  P[id].b  = d.b;
       if (d.d)  P[id].d  = d.d;
       if (d.md) P[id].md = d.md;
@@ -2793,7 +2815,30 @@ function render(rootId) {
 
       const nm = document.createElement('div');
       nm.className = 'nm';
-      nm.textContent = p.n + (p.nick ? ' (' + p.nick + ')' : '');
+      if (p.till) {
+        const tillSet = new Set(p.till.toLowerCase().split(/\s+/).filter(Boolean));
+        const words = p.n.split(' ');
+        words.forEach((word, i) => {
+          if (i > 0) nm.appendChild(document.createTextNode(' '));
+          const isLast = i === words.length - 1;
+          if (isLast || tillSet.has(word.toLowerCase())) {
+            nm.appendChild(document.createTextNode(word));
+          } else {
+            const sp = document.createElement('span');
+            sp.style.cssText = 'font-weight:400;color:#aaa';
+            sp.textContent = word;
+            nm.appendChild(sp);
+          }
+        });
+        if (p.nick) {
+          const ns = document.createElement('span');
+          ns.style.cssText = 'font-weight:400;color:#aaa';
+          ns.textContent = ' (' + p.nick + ')';
+          nm.appendChild(ns);
+        }
+      } else {
+        nm.textContent = p.n + (p.nick ? ' (' + p.nick + ')' : '');
+      }
       info.appendChild(nm);
 
       const dtRow = document.createElement('div');
