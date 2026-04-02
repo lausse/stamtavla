@@ -11,14 +11,14 @@
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-body { background: #eae6e0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+body { background: radial-gradient(ellipse at 30% 20%, #e8e4f0 0%, #eae6e0 40%, #e4e0d8 100%); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 
 #topbar {
-  flex-shrink: 0; background: #fff; border-bottom: 1px solid #ddd;
+  flex-shrink: 0; background: rgba(255,255,255,0.72); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid rgba(255,255,255,0.5);
   padding: 10px 20px; display: flex; align-items: center; gap: 16px;
-  box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  box-shadow: 0 1px 12px rgba(0,0,0,0.07);
 }
-#topbar h1 { font-size: 16px; font-weight: 700; color: #333; }
+#topbar h1 { font-size: 16px; font-weight: 800; letter-spacing: -0.3px; color: #333; }
 #focus-name { font-size: 14px; color: #666; flex: 1; }
 #back { padding: 6px 14px; border-radius: 20px; border: 1.5px solid #ccc; background: white; font-size: 13px; cursor: pointer; color: #555; transition: background .1s; }
 #back:hover:not(:disabled) { background: #f0f0f0; }
@@ -60,13 +60,14 @@ canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
 .sib:hover { filter: brightness(.92); }
 
 /* Colour themes */
-.c-sv   { border-color: #5ab6e0; background: #eaf5fc; } .c-sv   .av { background: #5ab6e0; }
-.c-svb  { border-color: #52bb52; background: #eafaea; } .c-svb  .av { background: #52bb52; }
-.c-rs   { border-color: #e06060; background: #fbeaea; } .c-rs   .av { background: #e06060; }
-.c-de   { border-color: #d0b040; background: #fdf8e0; } .c-de   .av { background: #d0b040; }
-.c-mix  { border-color: #9060d0; background: #f4eefb; } .c-mix  .av { background: #9060d0; }
+.c-sv   { border-color: #5ab6e0; background: linear-gradient(135deg, #dce8f5 0%, #c8dff0 100%); } .c-sv   .av { background: #5ab6e0; }
+.c-svb  { border-color: #52bb52; background: linear-gradient(135deg, #d5e8d5 0%, #c0dac0 100%); } .c-svb  .av { background: #52bb52; }
+.c-rs   { border-color: #e06060; background: linear-gradient(135deg, #f5dce0 0%, #f0c8cc 100%); } .c-rs   .av { background: #e06060; }
+.c-de   { border-color: #d0b040; background: linear-gradient(135deg, #f5f0dc 0%, #f0e8c0 100%); } .c-de   .av { background: #d0b040; }
+.c-mix  { border-color: #9060d0; background: linear-gradient(135deg, #ede0f5 0%, #e0ccf0 100%); } .c-mix  .av { background: #9060d0; }
 .c-unk  { border-color: #bbb;    background: #f7f7f7; } .c-unk  .av { background: #bbb;    }
 .c-unk .nm { color: #999; font-style: italic; }
+.card:hover { transform: translateY(-1px); transition: transform .15s ease; }
 
 /* Sibling chip colours */
 .sib-sv  { border-color: #5ab6e0; color: #2a7090; }
@@ -99,7 +100,7 @@ canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
 
 
 /* Gen labels */
-.gen-lbl { position: absolute; top: 10px; font-size: 10px; font-weight: 700; letter-spacing: .5px; color: #bbb; text-transform: uppercase; white-space: nowrap; pointer-events: none; }
+.gen-lbl { position: absolute; top: 10px; font-size: 10px; font-weight: 700; letter-spacing: 0.4px; color: #bbb; text-transform: uppercase; white-space: nowrap; pointer-events: none; background: rgba(255,255,255,0.55); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); border-radius: 10px; padding: 2px 8px; border: 1px solid rgba(255,255,255,0.7); }
 
 /* ── Main layout ── */
 #main { flex: 1; display: flex; overflow: hidden; }
@@ -109,6 +110,7 @@ canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
 #zoom-controls {
   position: fixed; bottom: 22px; left: 18px; z-index: 20;
   display: flex; flex-direction: column; gap: 5px;
+  background: rgba(255,255,255,0.75); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-radius: 50px; padding: 4px; box-shadow: 0 2px 12px rgba(0,0,0,0.12); border: 1px solid rgba(255,255,255,0.6);
 }
 .zoom-btn {
   width: 38px; height: 38px; border-radius: 50%;
@@ -123,10 +125,10 @@ canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
 
 /* ── Detail panel ── */
 #detail {
-  width: 272px; flex-shrink: 0;
+  width: 284px; flex-shrink: 0;
   background: #fafafa; border-left: 1px solid #ddd;
   display: flex; flex-direction: column; overflow: hidden;
-  transition: width .2s ease;
+  transition: width .2s ease, transform .3s cubic-bezier(.32,.72,0,1);
 }
 #detail.collapsed { width: 0; }
 #det-close {
@@ -176,9 +178,10 @@ canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
 #auth-zone { display:flex; align-items:center; gap:8px; }
 #auth-open-btn {
   padding: 5px 13px; border-radius: 20px;
-  border: 1.5px solid #5ab6e0; background: white;
-  font-size: 12px; cursor: pointer; color: #3a80a0;
+  border: 1.5px solid #5ab6e0; background: linear-gradient(135deg, #e8f0fe 0%, #d2e3fc 100%);
+  font-size: 12px; font-weight: 600; cursor: pointer; color: #3a80a0;
   transition: background .1s; white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(66,133,244,0.2);
 }
 #auth-open-btn:hover { background: #eaf5fc; }
 #user-chip {
@@ -216,11 +219,11 @@ canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
 
 /* ── Ansökningsmodal ── */
 #apply-modal {
-  position: fixed; inset: 0; background: rgba(0,0,0,.5);
+  position: fixed; inset: 0; background: rgba(0,0,0,.35); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
   z-index: 100; display: none; align-items: center; justify-content: center;
 }
 #apply-box {
-  background: white; border-radius: 18px; padding: 28px 28px 22px;
+  background: white; border-radius: 20px; padding: 28px 28px 22px;
   max-width: 420px; width: 92%; box-shadow: 0 8px 40px rgba(0,0,0,.22);
 }
 #apply-box h2 { font-size: 16px; margin-bottom: 8px; color: #222; }
@@ -262,12 +265,12 @@ canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
 
 /* ── Admin-panel ── */
 #admin-modal {
-  position: fixed; inset: 0; background: rgba(0,0,0,.5);
+  position: fixed; inset: 0; background: rgba(0,0,0,.35); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
   z-index: 100; display: none; align-items: flex-start;
   justify-content: center; padding-top: 60px;
 }
 #admin-box {
-  background: white; border-radius: 18px;
+  background: white; border-radius: 20px;
   width: 92%; max-width: 700px; max-height: 78vh;
   display: flex; flex-direction: column;
   box-shadow: 0 8px 40px rgba(0,0,0,.22);
@@ -307,12 +310,15 @@ canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
 #admin-btn:hover { background: #f5f5f5; }
 
 /* ── Toast ── */
+@keyframes toastIn { from { opacity:0; transform: translateX(-50%) translateY(8px) } to { opacity:1; transform: translateX(-50%) translateY(0) } }
 #toast {
   position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
-  background: rgba(40,40,40,.93); color: #fff;
+  background: rgba(40,40,60,0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); color: #fff;
   padding: 9px 18px; border-radius: 20px; font-size: 12.5px;
   pointer-events: none; z-index: 200; opacity: 0;
   transition: opacity .2s; white-space: nowrap;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.15);
+  animation: toastIn .2s ease;
 }
 #toast.show { opacity: 1; }
 
@@ -505,6 +511,18 @@ canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
   #detail { max-height: 50vh; }
   #zoom-controls.panel-open { bottom: calc(50vh + 14px); }
 }
+
+/* ── Detail panel — fade-in body ── */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px) } to { opacity: 1; transform: none } }
+.det-body { animation: fadeIn .2s ease; }
+
+/* ── Detail panel — nationsfärg-border i toppen ── */
+.det-head.c-sv  { border-top: 3px solid #5ab6e0; }
+.det-head.c-svb { border-top: 3px solid #52bb52; }
+.det-head.c-rs  { border-top: 3px solid #e06060; }
+.det-head.c-de  { border-top: 3px solid #d0b040; }
+.det-head.c-mix { border-top: 3px solid #9060d0; }
+.det-head.c-unk { border-top: 3px solid #bbb; }
 </style>
 </head>
 <body class="lang-sv">
@@ -1600,7 +1618,7 @@ async function renderDetail(id) {
       ? `<a href="${_photoItem.url}" target="_blank" rel="noopener" title="Öppna foto" style="display:block;text-decoration:none"><div class="det-av" style="background:${col};font-size:20px;cursor:pointer">📷</div></a>`
       : `<div class="det-av" style="background:${col}">${p.s==='F'?'♀':'♂'}</div>`;
 
-  html += `<div class="det-head" style="background:${col}18; border-left:4px solid ${col}">
+  html += `<div class="det-head c-${p.c||'unk'}" style="background:${col}18; border-left:4px solid ${col}">
     ${_avatarHtml}
     <div style="flex:1;min-width:0">
       <div class="det-name">${(()=>{
@@ -2730,10 +2748,12 @@ function drawLines(ctx, slots, pos) {
         const midX = (cx + px) / 2;
 
         ctx.strokeStyle = COLORS[P[pId].c] || '#aaa';
+        ctx.globalAlpha = 0.65;
         ctx.beginPath();
         ctx.moveTo(cx, cy);
         ctx.bezierCurveTo(midX, cy, midX, py, px, py);
         ctx.stroke();
+        ctx.globalAlpha = 1;
       });
 
     }
