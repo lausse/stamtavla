@@ -2027,6 +2027,7 @@ window.doAddComment = async function(id) {
 // ════ STATE ════
 const hist = [];
 let currentRoot = 'lasse';
+let pointerMoved = false;
 
 // ════ DOM REFS ════
 const viewport  = document.getElementById('viewport');
@@ -2954,14 +2955,18 @@ function render(rootId) {
       if (sibs.length > 0) card.appendChild(sibsDiv);
       if (barnDiv) card.appendChild(barnDiv);
 
-      // Click on card itself = focus, or re-open panel if already focused
-      if (!isFocus) {
-        card.addEventListener('click', () => focusPerson(id));
-      } else {
-        card.addEventListener('click', () => {
-          renderDetail(id);
+      // Click on card = show detail popup + scroll card to center (tree stays rooted at Lasse)
+      card.addEventListener('click', () => {
+        if (pointerMoved) return;   // var ett drag, inte ett klick
+        renderDetail(id);
+        const rect  = card.getBoundingClientRect();
+        const vrect = viewport.getBoundingClientRect();
+        viewport.scrollTo({
+          left: viewport.scrollLeft + rect.left - vrect.left - (vrect.width  - rect.width)  / 2,
+          top:  viewport.scrollTop  + rect.top  - vrect.top  - (vrect.height - rect.height) / 2,
+          behavior: 'smooth'
         });
-      }
+      });
 
       wrap.appendChild(card);
     });
@@ -3137,6 +3142,10 @@ viewport.addEventListener('wheel', e => {
   viewport.scrollLeft = cxBefore * zoom - mx;
   viewport.scrollTop  = cyBefore * zoom - my;
 }, { passive: false });
+
+// ── Drag-detektion: förhindra att klick triggas efter panorering ──
+document.addEventListener('mousedown', () => { pointerMoved = false; });
+document.addEventListener('mousemove', e => { if (e.buttons) pointerMoved = true; });
 
 // ── Klicka + dra = panorering ──
 let vpDragging = false, vpDragX = 0, vpDragY = 0, vpScrollX = 0, vpScrollY = 0;
