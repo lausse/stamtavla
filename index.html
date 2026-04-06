@@ -2178,17 +2178,18 @@ function openPrintView() {
   });
 
   // Initial positionering (slot-mittpunkter)
+  // Basera höjden på populerade slots i djupaste generationen (undviker enormt canvas)
   const deepestPop = Math.max(...slots.map(g => g.filter(Boolean).length));
-  const slotH0 = pcH[slots.length - 1] + PC_MIN_VGAP;
-  const totalPcH = slots[slots.length - 1].length * slotH0;
+  const slotH0 = Math.max(...pcH) + PC_MIN_VGAP;
+  const totalPcH = deepestPop * slotH0;
 
   const ppos = {};
   slots.forEach((gen, g) => {
-    const ns = gen.length;
-    const sh = totalPcH / ns;
-    gen.forEach((id, i) => {
-      if (!id) return;
-      ppos[id] = { x: PC_PAD_X + g * PC_COL, y: PC_PAD_Y + (i + 0.5) * sh };
+    // Räkna ut position enbart för populerade slots, jämnt fördelade
+    const populated = gen.map((id, i) => id ? {id, i} : null).filter(Boolean);
+    const ns = populated.length || 1;
+    populated.forEach(({id}, pi) => {
+      ppos[id] = { x: PC_PAD_X + g * PC_COL, y: PC_PAD_Y + (pi + 0.5) * (totalPcH / ns) };
     });
   });
 
@@ -2208,11 +2209,15 @@ function openPrintView() {
   const pcMaxX = PC_PAD_X + slots.length * PC_COL + PC_PAD_X;
   const pcMaxY = totalPcH + PC_PAD_Y * 2;
 
-  const DPR = 2;
+  const DPR = 1;   // DPR=2 ger för stort canvas (>16MP) och förstör iOS/mobil
   const cvEl = document.createElement('canvas');
   cvEl.width  = pcMaxX * DPR;
   cvEl.height = pcMaxY * DPR;
   const ctx = cvEl.getContext('2d');
+  if (!ctx) {
+    console.error('Canvas context failed – canvas too large?', pcMaxX, pcMaxY);
+    return;
+  }
   ctx.scale(DPR, DPR);
 
   ctx.fillStyle = '#fff';
