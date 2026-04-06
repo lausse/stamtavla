@@ -2149,164 +2149,187 @@ function openPrintView() {
   const ahnNr = {};
   slots.forEach((gen, g) => gen.forEach((id, i) => { if (id) ahnNr[id] = (1 << g) + i; }));
 
-  // ── Läs live-positioner från DOM (two-pass layout är klar) ──
-  const livePos = {};
-  wrap.querySelectorAll('.card[data-id]').forEach(card => {
-    const id = card.dataset.id;
-    const ch = card.offsetHeight;
-    livePos[id] = {
-      x: parseFloat(card.style.left) || 0,
-      y: (parseFloat(card.style.top) || 0) + ch / 2,   // center y = top + h/2
-      h: ch,
-      w: card.offsetWidth || CARD_W
-    };
+  // ── Bygg print-canvas från grunden (fresh layout, ej DOM-beroende) ──
+  const PC_W   = 192;   // kortbredd
+  const PC_GAP = 44;    // horisontellt mellanrum mellan generationer
+  const PC_COL = PC_W + PC_GAP;
+  const PC_HP  = 8;     // horisontell padding inuti kortet
+  const PC_VP  = 7;     // vertikal padding inuti kortet
+  const PC_LH  = 12;    // radavstånd
+  const PC_PAD_X = 22;
+  const PC_PAD_Y = 36;
+  const PC_MIN_VGAP = 10;  // minsta vertikalt mellanrum mellan kort
+
+  // Beräkna antal textrader per person
+  const pcLines = id => {
+    const p = P[id]; if (!p) return 3;
+    let n = 1;                                       // namn
+    if (p.b || p.d) n++;                             // datum
+    if (getSpouses(id).length) n++;                  // make/maka
+    const sibs = getSibs(id);
+    if (sibs.length) n += 1 + sibs.length;           // rubrik + en rad per syskon
+    return n;
+  };
+
+  // Kortstorleker: alla kort i samma generation lika höga
+  const pcH = slots.map(gen => {
+    const hs = gen.filter(Boolean).map(id => PC_VP * 2 + pcLines(id) * PC_LH);
+    return hs.length ? Math.max(...hs, PC_VP * 2 + 2 * PC_LH) : PC_VP * 2 + 2 * PC_LH;
   });
 
-  // ── Rita trädet på canvas ──
-  const PAD = 28;
-  const allIds = Object.keys(livePos);
-  const xMax = allIds.length ? Math.max(...allIds.map(id => livePos[id].x + livePos[id].w)) + PAD : 400;
-  const yMax = allIds.length ? Math.max(...allIds.map(id => livePos[id].y + livePos[id].h / 2)) + PAD : 300;
-  const CW = xMax, CH = yMax;
+  // Initial positionering (slot-mittpunkter)
+  const deepestPop = Math.max(...slots.map(g => g.filter(Boolean).length));
+  const slotH0 = pcH[slots.length - 1] + PC_MIN_VGAP;
+  const totalPcH = slots[slots.length - 1].length * slotH0;
 
-  const DPR = 2;   // retina
+  const ppos = {};
+  slots.forEach((gen, g) => {
+    const ns = gen.length;
+    const sh = totalPcH / ns;
+    gen.forEach((id, i) => {
+      if (!id) return;
+      ppos[id] = { x: PC_PAD_X + g * PC_COL, y: PC_PAD_Y + (i + 0.5) * sh };
+    });
+  });
+
+  // Centrera föräldrar på barn (enkel pass)
+  for (let g = slots.length - 2; g >= 0; g--) {
+    slots[g].forEach((id, i) => {
+      if (!id) return;
+      const fY = (slots[g+1]?.[i*2]   && ppos[slots[g+1][i*2]])   ? ppos[slots[g+1][i*2]].y   : null;
+      const mY = (slots[g+1]?.[i*2+1] && ppos[slots[g+1][i*2+1]]) ? ppos[slots[g+1][i*2+1]].y : null;
+      if (fY !== null && mY !== null) ppos[id].y = (fY + mY) / 2;
+      else if (fY !== null) ppos[id].y = fY;
+      else if (mY !== null) ppos[id].y = mY;
+    });
+  }
+
+  // Canvas-storlek
+  const pcMaxX = PC_PAD_X + slots.length * PC_COL + PC_PAD_X;
+  const pcMaxY = totalPcH + PC_PAD_Y * 2;
+
+  const DPR = 2;
   const cvEl = document.createElement('canvas');
-  cvEl.width  = CW * DPR;
-  cvEl.height = CH * DPR;
+  cvEl.width  = pcMaxX * DPR;
+  cvEl.height = pcMaxY * DPR;
   const ctx = cvEl.getContext('2d');
   ctx.scale(DPR, DPR);
 
-  // Vit bakgrund
   ctx.fillStyle = '#fff';
-  ctx.fillRect(0, 0, CW, CH);
+  ctx.fillRect(0, 0, pcMaxX, pcMaxY);
 
-  // Bezier-linjer (samma algoritm som drawLines)
-  ctx.lineWidth = 1.5;
-  ctx.lineCap  = 'round';
+  // Hjälpfunktioner
+  const rrect = (x, y, w, h, r) => {
+    ctx.beginPath();
+    ctx.moveTo(x+r, y);
+    ctx.lineTo(x+w-r, y); ctx.arcTo(x+w, y, x+w, y+r, r);
+    ctx.lineTo(x+w, y+h-r); ctx.arcTo(x+w, y+h, x+w-r, y+h, r);
+    ctx.lineTo(x+r, y+h); ctx.arcTo(x, y+h, x, y+h-r, r);
+    ctx.lineTo(x, y+r); ctx.arcTo(x, y, x+r, y, r);
+    ctx.closePath();
+  };
+  const clip = (t, maxW) => {
+    if (!t) return '';
+    if (ctx.measureText(t).width <= maxW) return t;
+    while (t.length > 1 && ctx.measureText(t+'…').width > maxW) t = t.slice(0,-1);
+    return t + '…';
+  };
+
+  // Bezier-linjer
+  ctx.lineWidth = 1.5; ctx.lineCap = 'round';
   for (let g = 1; g < slots.length; g++) {
-    for (let ci = 0; ci < slots[g - 1].length; ci++) {
-      const childId = slots[g - 1][ci];
-      if (!childId || !livePos[childId]) continue;
-      const ch  = livePos[childId];
-      const cx  = ch.x + ch.w;
-      const cy  = ch.y;
-      [slots[g][ci * 2 + 1], slots[g][ci * 2]].forEach(pId => {
-        if (!pId || !livePos[pId]) return;
-        const pp   = livePos[pId];
-        const midX = (cx + pp.x) / 2;
+    for (let ci = 0; ci < slots[g-1].length; ci++) {
+      const chId = slots[g-1][ci];
+      if (!chId || !ppos[chId]) continue;
+      const cx = ppos[chId].x + PC_W;
+      const cy = ppos[chId].y;
+      [slots[g][ci*2+1], slots[g][ci*2]].forEach(pId => {
+        if (!pId || !ppos[pId]) return;
+        const midX = (cx + ppos[pId].x) / 2;
         ctx.strokeStyle = COLORS[P[pId].c] || '#aaa';
-        ctx.globalAlpha = 0.6;
+        ctx.globalAlpha = 0.55;
         ctx.beginPath();
         ctx.moveTo(cx, cy);
-        ctx.bezierCurveTo(midX, cy, midX, pp.y, pp.x, pp.y);
+        ctx.bezierCurveTo(midX, cy, midX, ppos[pId].y, ppos[pId].x, ppos[pId].y);
         ctx.stroke();
         ctx.globalAlpha = 1;
       });
     }
   }
 
-  // Hjälpfunktion: rundad rektangel
-  const rrect = (x, y, w, h, r) => {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.lineTo(x + w - r, y); ctx.arcTo(x + w, y, x + w, y + r, r);
-    ctx.lineTo(x + w, y + h - r); ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
-    ctx.lineTo(x + r, y + h); ctx.arcTo(x, y + h, x, y + h - r, r);
-    ctx.lineTo(x, y + r); ctx.arcTo(x, y, x + r, y, r);
-    ctx.closePath();
-  };
-
-  // Hjälpfunktion: klipp text till maxbredd
-  const clip = (t, maxW) => {
-    if (ctx.measureText(t).width <= maxW) return t;
-    while (t.length > 1 && ctx.measureText(t + '…').width > maxW) t = t.slice(0, -1);
-    return t + '…';
-  };
-
   // Rita kortboxar
-  allIds.forEach(id => {
-    const p = P[id];
-    if (!p) return;
-    const {x, y, h, w} = livePos[id];
-    const top = y - h / 2;
-    const col = COLORS[p.c] || '#bbb';
-    const nr  = ahnNr[id] || nrOf[id] || '';
+  slots.forEach((gen, g) => {
+    const h = pcH[g];
+    gen.forEach(id => {
+      if (!id || !ppos[id]) return;
+      const p   = P[id];
+      const {x, y} = ppos[id];
+      const top = y - h / 2;
+      const col = COLORS[p.c] || '#bbb';
+      const nr  = ahnNr[id] || nrOf[id] || '';
 
-    // Skugga
-    ctx.save();
-    ctx.shadowColor = 'rgba(0,0,0,.10)';
-    ctx.shadowBlur  = 4;
-    ctx.shadowOffsetY = 2;
-    ctx.fillStyle = '#fff';
-    rrect(x, top, w, h, 10);
-    ctx.fill();
-    ctx.restore();
+      // Skugga + box
+      ctx.save();
+      ctx.shadowColor = 'rgba(0,0,0,.10)'; ctx.shadowBlur = 4; ctx.shadowOffsetY = 2;
+      ctx.fillStyle = '#fff'; rrect(x, top, PC_W, h, 8); ctx.fill();
+      ctx.restore();
+      ctx.strokeStyle = col; ctx.lineWidth = 1.8;
+      ctx.fillStyle = col + '16'; rrect(x, top, PC_W, h, 8); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = col; rrect(x, top, 4, h, 3); ctx.fill();
 
-    // Kant + ljus fyllning
-    ctx.strokeStyle = col;
-    ctx.lineWidth   = 2;
-    ctx.fillStyle   = col + '18';
-    rrect(x, top, w, h, 10);
-    ctx.fill();
-    ctx.stroke();
+      // Ahnentafel-nr
+      if (nr !== '') {
+        ctx.fillStyle = '#bbb'; ctx.font = 'bold 7.5px system-ui,sans-serif'; ctx.textAlign = 'right';
+        ctx.fillText(String(nr), x + PC_W - 5, top + 10);
+      }
 
-    // Färgad vänsterkant
-    ctx.fillStyle = col;
-    rrect(x, top, 5, h, 3);
-    ctx.fill();
+      let ly = top + PC_VP + PC_LH;
 
-    // Ahnentafel-nummer (liten, övre höger)
-    if (nr !== '') {
-      ctx.fillStyle = '#aaa';
-      ctx.font = 'bold 8px system-ui, sans-serif';
-      ctx.textAlign = 'right';
-      ctx.fillText(String(nr), x + w - 5, top + 11);
-    }
+      // Namn (fetstil, hela namnet)
+      ctx.fillStyle = '#111'; ctx.font = 'bold 10px system-ui,sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText(clip(p.n + (p.nick ? ` „${p.nick}"` : ''), PC_W - 16), x + PC_HP, ly);
+      ly += PC_LH;
 
-    // Namn
-    ctx.fillStyle = '#1a1a1a';
-    ctx.font      = 'bold 10px system-ui, sans-serif';
-    ctx.textAlign = 'left';
-    const nameText = clip(p.nick ? `${p.n} „${p.nick}"` : p.n, w - 18);
-    ctx.fillText(nameText, x + 9, top + 17);
+      // Datum
+      const dob = p.b ? '*'+yearOnly(p.b) : '';
+      const dod = p.d ? '\u2020'+yearOnly(p.d) : '';
+      const dates = [dob,dod].filter(Boolean).join('  ');
+      if (dates) {
+        ctx.fillStyle = '#555'; ctx.font = '9px system-ui,sans-serif';
+        ctx.fillText(dates, x + PC_HP, ly); ly += PC_LH;
+      }
 
-    // Datum
-    const dob = p.b ? '*' + yearOnly(p.b) : '';
-    const dod = p.d ? '\u2020' + yearOnly(p.d) : '';
-    const dates = [dob, dod].filter(Boolean).join('\u2002');
-    if (dates) {
-      ctx.fillStyle = '#666';
-      ctx.font      = '9px system-ui, sans-serif';
-      ctx.fillText(dates, x + 9, top + 29);
-    }
-
-    // Make/maka
-    let nextLineY = top + 41;
-    if (h > 42) {
+      // Make/maka (hela namn)
       const sps = getSpouses(id);
       if (sps.length) {
-        const spTxt = '\u26AD\u202F' + sps.map(s => s.n.split(' ')[0]).join(', ');
-        ctx.fillStyle = '#a080b0';
-        ctx.font      = '8.5px system-ui, sans-serif';
-        ctx.fillText(clip(spTxt, w - 14), x + 9, nextLineY);
-        nextLineY += 11;
+        ctx.fillStyle = '#9070a8'; ctx.font = '8.5px system-ui,sans-serif';
+        ctx.fillText(clip('\u26AD\u202F' + sps.map(s=>s.n).join(', '), PC_W - 12), x + PC_HP, ly);
+        ly += PC_LH;
       }
-    }
 
-    // Syskon (om kortet är tillräckligt högt, dvs. har syskon-rad i DOM)
-    if (h > nextLineY - top + 2) {
+      // Syskon — en per rad med fullständigt namn + datum
       const sibs = getSibs(id);
       if (sibs.length) {
-        const sibLabel = lang === 'de' ? 'Geschwister: ' : lang === 'en' ? 'siblings: ' : 'syskon: ';
-        const sibNames = sibs.map(s => s.n.split(' ')[0]).join(', ');
-        ctx.fillStyle = '#888';
-        ctx.font      = '7.5px system-ui, sans-serif';
-        ctx.fillText(clip(sibLabel + sibNames, w - 14), x + 9, nextLineY + 2);
+        // Separator
+        ctx.strokeStyle = '#ddd'; ctx.lineWidth = 0.5;
+        ctx.beginPath(); ctx.moveTo(x+PC_HP, ly-3); ctx.lineTo(x+PC_W-PC_HP, ly-3); ctx.stroke();
+        // Rubrik
+        const sibLbl = lang==='de' ? 'GESCHWISTER' : lang==='en' ? 'SIBLINGS' : 'SYSKON';
+        ctx.fillStyle = '#bbb'; ctx.font = 'bold 7px system-ui,sans-serif';
+        ctx.fillText(sibLbl, x + PC_HP, ly); ly += PC_LH - 1;
+        // En rad per syskon
+        sibs.forEach(s => {
+          const sd = s.b ? ' *'+yearOnly(s.b) : '';
+          const dd = s.d ? ' \u2020'+yearOnly(s.d) : '';
+          ctx.fillStyle = '#555'; ctx.font = '8.5px system-ui,sans-serif';
+          ctx.fillText(clip(s.n + sd + dd, PC_W - 14), x + PC_HP + 4, ly);
+          ly += PC_LH;
+        });
       }
-    }
+    });
   });
 
-  // Canvas → data-URL (inga cross-origin bilder ritas, säkert)
+  // Canvas → data-URL
   const treeImgSrc = cvEl.toDataURL('image/png');
 
   // ── Förfädersförteckning (HTML) ──
