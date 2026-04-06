@@ -81,6 +81,11 @@ canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
 .section-lbl { font-size: 10px; font-weight: 700; color: #ccc; white-space: nowrap; flex-shrink: 0; width: 28px; text-align: right; padding-top: 3px; }
 .chips { display: flex; flex-wrap: wrap; gap: 3px; justify-content: flex-end; }
 
+/* Print button */
+#print-btn { font-size: 15px; background: none; border: 1px solid #ddd; border-radius: 6px;
+             padding: 2px 7px; cursor: pointer; opacity: .6; transition: opacity .1s; margin-left: 4px; }
+#print-btn:hover { opacity: 1; background: #f5f5f5; }
+
 /* Language toggle */
 #lang-toggle { display: flex; gap: 3px; margin-left: 8px; }
 .lang-btn { font-size: 17px; background: none; border: 2px solid transparent;
@@ -559,6 +564,7 @@ canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
   <span id="focus-name"></span>
   <button id="back" disabled>← Tillbaka</button>
   <span class="hint">Klicka ett syskon för att centrera trädet på den personen</span>
+  <button id="print-btn" onclick="openPrintView()" title="Ladda ner / Skriv ut som PDF">🖨</button>
   <div id="lang-toggle">
     <button class="lang-btn active" data-lang="sv">🇸🇪</button>
     <button class="lang-btn"        data-lang="de">🇩🇪</button>
@@ -687,6 +693,7 @@ const LANG = {
     detSiblings: 'Syskon',
     detNote:     'Anteckning',
     detEmpty:    'Välj en person i trädet',
+    printTitle:     'Ladda ner / Skriv ut som PDF',
     bildarkiv:      'Bildarkiv',
     modalTitle:     '📷 Bildarkivet',
     modalIntro:     'Stamtavlan är öppen för alla — men familjebilderna är reserverade för släktmedlemmar. Fyll i formuläret nedan så hör Lasse av sig inom några dagar.',
@@ -714,6 +721,7 @@ const LANG = {
     detSiblings: 'Geschwister',
     detNote:     'Notiz',
     detEmpty:    'Wähle eine Person im Baum aus',
+    printTitle:     'Als PDF herunterladen / Drucken',
     bildarkiv:      'Fotoarchiv',
     modalTitle:     '📷 Fotoarchiv',
     modalIntro:     'Der Stammbaum ist für alle zugänglich — aber die Familienfotos sind Familienmitgliedern vorbehalten. Füllen Sie das Formular aus, und Lasse meldet sich innerhalb weniger Tage.',
@@ -741,6 +749,7 @@ const LANG = {
     detSiblings: 'Siblings',
     detNote:     'Note',
     detEmpty:    'Select a person in the tree',
+    printTitle:     'Download / Print as PDF',
     bildarkiv:      'Photo archive',
     modalTitle:     '📷 Photo archive',
     modalIntro:     'The family tree is open to everyone — but the family photos are reserved for family members. Fill in the form below and Lasse will get back to you within a few days.',
@@ -2082,6 +2091,179 @@ function goHome() {
 }
 
 
+// ════ PRINT / PDF ════
+function openPrintView() {
+  const root = currentRoot;
+  if (!P[root]) return;
+
+  // ── Bygg Ahnentafel-lista (BFS uppåt i trädet) ──
+  const entries = [];
+  const seen    = new Set();
+  const queue   = [{id: root, nr: 1}];
+  while (queue.length) {
+    const {id, nr} = queue.shift();
+    const p = P[id];
+    if (!p || seen.has(id)) continue;
+    seen.add(id);
+    entries.push({nr, id, p});
+    if (p.fi && P[p.fi]) queue.push({id: p.fi, nr: nr * 2});
+    if (p.mi && P[p.mi]) queue.push({id: p.mi, nr: nr * 2 + 1});
+  }
+  entries.sort((a, b) => a.nr - b.nr);
+
+  // ── Hjälpare ──
+  const genOf   = nr => Math.floor(Math.log2(nr));
+  const nrOf    = {};
+  entries.forEach(e => { nrOf[e.id] = e.nr; });
+
+  const GL = {
+    sv: ['Proband','Föräldrar','Mor-/farföräldrar','Gammelföräldrar','Ggammelföräldrar','Gggammelföräldrar'],
+    de: ['Proband','Eltern','Großeltern','Urgroßeltern','Ururgroßeltern','Urururgroßeltern'],
+    en: ['Proband','Parents','Grandparents','Great-grandparents','GG-grandparents','GGG-grandparents']
+  };
+  const genLabel = g => (GL[lang] || GL.sv)[g] || `${lang === 'en' ? 'Generation' : 'Generation'} ${g}`;
+
+  const L = {
+    sv: { title:'Stamtavla', probandOf:'Stamtavla för', generated:'Genererad', ancestors:'Förfädersförteckning', notes:'Noteringar', father:'Far', mother:'Mor', parents:'Föräldrar', persons:'personer', noDesc:'Inga noteringar.' },
+    de: { title:'Stammbaum', probandOf:'Stammbaum von', generated:'Generiert am', ancestors:'Vorfahrenliste', notes:'Notizen', father:'Vater', mother:'Mutter', parents:'Eltern', persons:'Personen', noDesc:'Keine Notizen.' },
+    en: { title:'Family Tree', probandOf:'Family tree of', generated:'Generated', ancestors:'Ancestor list', notes:'Notes', father:'Father', mother:'Mother', parents:'Parents', persons:'persons', noDesc:'No notes.' }
+  }[lang] || {title:'Stamtavla', probandOf:'Stamtavla för', generated:'Genererad', ancestors:'Förfädersförteckning', notes:'Noteringar', father:'Far', mother:'Mor', parents:'Föräldrar', persons:'personer', noDesc:'Inga noteringar.'};
+
+  const getDesc = p => {
+    if (lang === 'de') return p.desc_de || p.desc || '';
+    if (lang === 'en') return p.desc_en || p.desc || p.desc_de || '';
+    return p.desc || p.desc_de || '';
+  };
+
+  const today = new Date().toLocaleDateString(
+    lang === 'en' ? 'en-GB' : lang === 'de' ? 'de-DE' : 'sv-SE',
+    {year:'numeric', month:'long', day:'numeric'}
+  );
+
+  // ── Förfädersförteckning ──
+  const byGen = {};
+  entries.forEach(e => {
+    const g = genOf(e.nr);
+    (byGen[g] = byGen[g] || []).push(e);
+  });
+
+  let mainHTML = '';
+  Object.keys(byGen).sort((a, b) => +a - +b).forEach(g => {
+    mainHTML += `<div class="gen-block">
+      <div class="gen-lbl">${genLabel(+g)}</div>`;
+    byGen[g].forEach(({nr, id, p}) => {
+      const dob    = p.b ? `*${fmtDate(p.b)}` : '';
+      const dod    = p.d ? `\u2020${fmtDate(p.d)}` : '';
+      const dates  = [dob, dod].filter(Boolean).join('\u2002');
+      const madn   = p.mn ? `, f. ${p.mn}` : '';
+      const nick   = p.nick ? ` \u201e${p.nick}\u201c` : '';
+      const sp     = getSpouses(id).map(s => `\u26AD\u202F${s.n}${s.b ? ' *' + fmtDate(s.b) : ''}`).join(', ');
+      const fnr    = p.fi && nrOf[p.fi] ? `${L.father} \u2192 <strong>${nrOf[p.fi]}</strong>` : '';
+      const mnr    = p.mi && nrOf[p.mi] ? `${L.mother} \u2192 <strong>${nrOf[p.mi]}</strong>` : '';
+      const parRef = (fnr || mnr) ? `${fnr}${fnr && mnr ? '\u2003' : ''}${mnr}` : '';
+      const hasDesc = !!getDesc(p);
+      mainHTML += `
+        <div class="prow">
+          <span class="pnr">${nr}${hasDesc ? '<sup>*</sup>' : ''}</span>
+          <div class="pinfo">
+            <span class="pname">${p.n}${nick}${madn}</span>
+            ${dates  ? `<span class="pdates">${dates}</span>` : ''}
+            ${sp     ? `<span class="psp">${sp}</span>` : ''}
+            ${parRef ? `<span class="ppar">${parRef}</span>` : ''}
+          </div>
+        </div>`;
+    });
+    mainHTML += `</div>`;
+  });
+
+  // ── Noteringar ──
+  let notesHTML = '';
+  entries.filter(e => getDesc(e.p)).forEach(({nr, id, p}) => {
+    notesHTML += `
+      <div class="nentry">
+        <span class="nnr">${nr}.</span>
+        <div class="nbody">
+          <div class="nname">${p.n}${p.b ? ` (*${fmtDate(p.b)})` : ''}${p.d ? ` \u2020${fmtDate(p.d)}` : ''}</div>
+          <div class="ntext">${getDesc(p).replace(/\n/g, '<br>').replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')}</div>
+        </div>
+      </div>`;
+  });
+
+  // ── Komplett HTML ──
+  const html = `<!DOCTYPE html>
+<html lang="${lang}">
+<head>
+<meta charset="UTF-8">
+<title>${L.title} \u2014 ${P[root].n}</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; }
+  body { font-family: Georgia, 'Times New Roman', serif; font-size: 10.5pt; color: #111;
+         max-width: 740px; margin: 0 auto; padding: 28px 24px; }
+  h1   { font-size: 19pt; margin: 0 0 4px; border-bottom: 2px solid #222; padding-bottom: 6px; }
+  .meta { font-size: 9pt; color: #666; margin-bottom: 28px; }
+  h2   { font-size: 12pt; text-transform: uppercase; letter-spacing: .8px;
+         border-bottom: 1px solid #bbb; padding-bottom: 3px; margin: 30px 0 10px; }
+  .gen-block { margin-bottom: 10px; }
+  .gen-lbl   { font-size: 8pt; text-transform: uppercase; letter-spacing: .7px;
+               color: #999; margin: 10px 0 4px 38px; }
+  .prow  { display: flex; gap: 6px; padding: 4px 0;
+           border-bottom: 1px dotted #e0e0e0; align-items: baseline; }
+  .pnr   { min-width: 34px; text-align: right; font-weight: bold; font-size: 10pt;
+           color: #333; flex-shrink: 0; }
+  .pnr sup { font-size: 7pt; color: #888; }
+  .pinfo { display: flex; flex-wrap: wrap; gap: 2px 10px; align-items: baseline; }
+  .pname  { font-weight: bold; }
+  .pdates { font-size: 9.5pt; color: #444; }
+  .psp    { font-size: 9pt; color: #777; font-style: italic; }
+  .ppar   { font-size: 8.5pt; color: #999; width: 100%; }
+  #notes  { page-break-before: always; }
+  .nentry { display: flex; gap: 8px; margin-bottom: 14px;
+            padding-bottom: 12px; border-bottom: 1px solid #eee;
+            page-break-inside: avoid; }
+  .nnr    { min-width: 34px; text-align: right; font-weight: bold;
+            font-size: 10pt; color: #333; flex-shrink: 0; padding-top: 1px; }
+  .nname  { font-weight: bold; font-size: 10pt; margin-bottom: 3px; }
+  .ntext  { font-size: 9.5pt; color: #333; line-height: 1.55; }
+  .footer { margin-top: 36px; font-size: 8pt; color: #bbb; text-align: center; }
+  @media print {
+    body { max-width: 100%; padding: 0; }
+    .gen-block { page-break-inside: avoid; }
+    h2 { page-break-after: avoid; }
+  }
+</style>
+</head>
+<body>
+<h1>${L.title}</h1>
+<div class="meta">
+  ${L.probandOf} <strong>${P[root].n}</strong>
+  &ensp;&middot;&ensp;
+  ${L.generated}: ${today}
+  &ensp;&middot;&ensp;
+  ${entries.length}\u00a0${L.persons}
+  &ensp;&middot;&ensp;
+  Ahnentafel
+</div>
+
+<h2>${L.ancestors}</h2>
+${mainHTML}
+
+<div id="notes">
+  <h2>${L.notes} <span style="font-size:9pt;font-weight:normal;color:#aaa">(* = har notering)</span></h2>
+  ${notesHTML || `<p><em>${L.noDesc}</em></p>`}
+</div>
+
+<div class="footer">lausse.github.io/stamtavla &ensp;&middot;&ensp; ${today}</div>
+</body>
+</html>`;
+
+  const win = window.open('', '_blank');
+  if (!win) { alert(lang === 'de' ? 'Popup blockiert — bitte erlauben.' : lang === 'en' ? 'Popup blocked — please allow.' : 'Popup blockerad — tillåt popup för denna sida.'); return; }
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 500);
+}
+
 // ════ TOAST ════
 let toastTimer = null;
 function showToast(msg, ms = 3000) {
@@ -3222,6 +3404,7 @@ function setLang(l) {
   document.getElementById('back').textContent = LANG[l].back;
   document.querySelector('.hint').textContent = LANG[l].hint;
   document.getElementById('auth-open-btn').textContent = '📷 ' + LANG[l].bildarkiv;
+  document.getElementById('print-btn').title = LANG[l].printTitle;
 
   // ── Modal ──
   const L = LANG[l];
