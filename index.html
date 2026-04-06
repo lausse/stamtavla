@@ -2279,14 +2279,28 @@ function openPrintView() {
       ctx.fillText(dates, x + 9, top + 29);
     }
 
-    // Make/maka (om kortet är tillräckligt högt)
+    // Make/maka
+    let nextLineY = top + 41;
     if (h > 42) {
       const sps = getSpouses(id);
       if (sps.length) {
         const spTxt = '\u26AD\u202F' + sps.map(s => s.n.split(' ')[0]).join(', ');
         ctx.fillStyle = '#a080b0';
         ctx.font      = '8.5px system-ui, sans-serif';
-        ctx.fillText(clip(spTxt, w - 14), x + 9, top + 41);
+        ctx.fillText(clip(spTxt, w - 14), x + 9, nextLineY);
+        nextLineY += 11;
+      }
+    }
+
+    // Syskon (om kortet är tillräckligt högt, dvs. har syskon-rad i DOM)
+    if (h > nextLineY - top + 2) {
+      const sibs = getSibs(id);
+      if (sibs.length) {
+        const sibLabel = lang === 'de' ? 'Geschwister: ' : lang === 'en' ? 'siblings: ' : 'syskon: ';
+        const sibNames = sibs.map(s => s.n.split(' ')[0]).join(', ');
+        ctx.fillStyle = '#888';
+        ctx.font      = '7.5px system-ui, sans-serif';
+        ctx.fillText(clip(sibLabel + sibNames, w - 14), x + 9, nextLineY + 2);
       }
     }
   });
@@ -3314,18 +3328,26 @@ function render(rootId) {
       if (sibs.length > 0) card.appendChild(sibsDiv);
       if (barnDiv) card.appendChild(barnDiv);
 
-      // Click on card = show detail popup + scroll card to center (tree stays rooted at Lasse)
+      // Click on card = show detail popup; scroll to center only if card is off-screen
       card.addEventListener('click', () => {
         if (pointerMoved) return;   // var ett drag, inte ett klick
         currentDetailId = id;
         renderDetail(id);
         const rect  = card.getBoundingClientRect();
         const vrect = viewport.getBoundingClientRect();
-        viewport.scrollTo({
-          left: viewport.scrollLeft + rect.left - vrect.left - (vrect.width  - rect.width)  / 2,
-          top:  viewport.scrollTop  + rect.top  - vrect.top  - (vrect.height - rect.height) / 2,
-          behavior: 'smooth'
-        });
+        const margin = 24;   // px innanför viewport-kanten som räknas som "synlig"
+        const fullyVisible =
+          rect.left   >= vrect.left   + margin &&
+          rect.right  <= vrect.right  - margin &&
+          rect.top    >= vrect.top    + margin &&
+          rect.bottom <= vrect.bottom - margin;
+        if (!fullyVisible) {
+          viewport.scrollTo({
+            left: viewport.scrollLeft + rect.left - vrect.left - (vrect.width  - rect.width)  / 2,
+            top:  viewport.scrollTop  + rect.top  - vrect.top  - (vrect.height - rect.height) / 2,
+            behavior: 'smooth'
+          });
+        }
       });
 
       wrap.appendChild(card);
@@ -3503,9 +3525,11 @@ viewport.addEventListener('wheel', e => {
   viewport.scrollTop  = cyBefore * zoom - my;
 }, { passive: false });
 
-// ── Drag-detektion: förhindra att klick triggas efter panorering ──
-document.addEventListener('mousedown', () => { pointerMoved = false; });
-document.addEventListener('mousemove', e => { if (e.buttons) pointerMoved = true; });
+// ── Drag-detektion: förhindra att klick triggas efter panorering (mus + touch) ──
+document.addEventListener('mousedown',  () => { pointerMoved = false; });
+document.addEventListener('touchstart', () => { pointerMoved = false; }, { passive: true });
+document.addEventListener('mousemove',  e  => { if (e.buttons) pointerMoved = true; });
+document.addEventListener('touchmove',  ()  => { pointerMoved = true;  }, { passive: true });
 
 // ── Klicka + dra = panorering ──
 let vpDragging = false, vpDragX = 0, vpDragY = 0, vpScrollX = 0, vpScrollY = 0;
