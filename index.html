@@ -679,7 +679,7 @@ const LANG = {
   sv: {
     title:    'Stamtavla',
     back:     '← Tillbaka',
-    hint:     'Klicka ett syskon för att centrera trädet på den personen',
+    hint:     'Klicka en person för att se detaljer',
     genLabels:['Du / Fokus','Föräldrar','Mor-/farföräldrar','Gammelföräldrar','Ggammelföräldrar','Gggammelföräldrar'],
     detParents:  'Föräldrar',
     detSpouse:   'Make / Maka',
@@ -706,7 +706,7 @@ const LANG = {
   de: {
     title:    'Stammbaum',
     back:     '← Zurück',
-    hint:     'Klicke auf ein Geschwister, um den Baum auf diese Person zu zentrieren',
+    hint:     'Klicke auf eine Person, um Details anzuzeigen',
     genLabels:['Du / Fokus','Eltern','Großeltern','Urgroßeltern','Ururgroßeltern','Urururgroßeltern'],
     detParents:  'Eltern',
     detSpouse:   'Ehepartner',
@@ -733,7 +733,7 @@ const LANG = {
   en: {
     title:    'Family Tree',
     back:     '← Back',
-    hint:     'Click a sibling to centre the tree on that person',
+    hint:     'Click a person to see their details',
     genLabels:['You / Focus','Parents','Grandparents','Great-grandparents','GG-grandparents','GGG-grandparents'],
     detParents:  'Parents',
     detSpouse:   'Spouse',
@@ -1749,13 +1749,14 @@ async function renderDetail(id) {
     </div>`;
   }
 
-  // Description — auto-translate till engelska om desc_en saknas
+  // Description — välj rätt språkversion, fall tillbaka på översättning
   const t = LANG[lang];
   let descText = p['desc_' + lang] || (lang !== 'sv' ? '' : p.desc);
-  if (!descText && lang === 'en' && p.desc) {
-    descText = await autoTranslate(p.desc, 'sv', 'en');
+  if (!descText && lang === 'en') {
+    if (p.desc)       descText = await autoTranslate(p.desc,    'sv', 'en');
+    else if (p.desc_de) descText = await autoTranslate(p.desc_de, 'de', 'en');
   } else if (!descText) {
-    descText = p.desc || '';
+    descText = p.desc || p.desc_de || '';   // svenska → tyska som fallback för övriga språk
   }
   if (descText) {
     html += `<div class="det-section"><div class="det-text">${descText}</div></div>`;
@@ -2027,6 +2028,7 @@ window.doAddComment = async function(id) {
 // ════ STATE ════
 const hist = [];
 let currentRoot = 'lasse';
+let currentDetailId = 'lasse';   // person som visas i panelen (kan skilja sig från currentRoot)
 let pointerMoved = false;
 
 // ════ DOM REFS ════
@@ -2041,6 +2043,7 @@ function focusPerson(id) {
   if (!P[id] || id === currentRoot) return;
   hist.push({id: currentRoot, zoom, scrollLeft: viewport.scrollLeft, scrollTop: viewport.scrollTop});
   currentRoot = id;
+  currentDetailId = id;
   history.replaceState(null, '', '#' + id);
   const doRender = () => { render(id); renderDetail(id); };
   if (document.startViewTransition) {
@@ -2958,6 +2961,7 @@ function render(rootId) {
       // Click on card = show detail popup + scroll card to center (tree stays rooted at Lasse)
       card.addEventListener('click', () => {
         if (pointerMoved) return;   // var ett drag, inte ett klick
+        currentDetailId = id;
         renderDetail(id);
         const rect  = card.getBoundingClientRect();
         const vrect = viewport.getBoundingClientRect();
@@ -3248,7 +3252,7 @@ function setLang(l) {
   }
 
   render(currentRoot);
-  renderDetail(currentRoot);
+  renderDetail(currentDetailId);   // uppdatera panelen med rätt person (kan skilja sig från trädroten)
 }
 document.querySelectorAll('.lang-btn').forEach(btn =>
   btn.addEventListener('click', () => setLang(btn.dataset.lang))
