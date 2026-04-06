@@ -36,7 +36,7 @@ canvas#cv { position: absolute; top: 0; left: 0; pointer-events: none; }
 .card {
   position: absolute; display: flex; flex-direction: column;
   padding: 5px 8px 5px 6px; border-radius: 14px; border: 2px solid;
-  width: 184px; transform: translateY(-50%);
+  width: 184px;
   background: white; cursor: pointer;
   transition: filter .12s, box-shadow .12s;
 }
@@ -2153,10 +2153,11 @@ function openPrintView() {
   const livePos = {};
   wrap.querySelectorAll('.card[data-id]').forEach(card => {
     const id = card.dataset.id;
+    const ch = card.offsetHeight;
     livePos[id] = {
       x: parseFloat(card.style.left) || 0,
-      y: parseFloat(card.style.top)  || 0,   // center y (translateY(-50%))
-      h: card.offsetHeight,
+      y: (parseFloat(card.style.top) || 0) + ch / 2,   // center y = top + h/2
+      h: ch,
       w: card.offsetWidth || CARD_W
     };
   });
@@ -2327,6 +2328,11 @@ function openPrintView() {
       const mnr    = p.mi && nrOf[p.mi] ? `${L.mother} \u2192 <strong>${nrOf[p.mi]}</strong>` : '';
       const parRef = (fnr || mnr) ? `${fnr}${fnr && mnr ? '\u2003' : ''}${mnr}` : '';
       const hasDsc = !!getDesc(p);
+      const sibsHTML = getSibs(id).map(s => {
+        const sd = s.b ? `*${fmtDate(s.b)}` : '';
+        const dd = s.d ? `\u2020${fmtDate(s.d)}` : '';
+        return `<div class="psib">${s.n}${sd || dd ? `<span class="psib-d">${[sd,dd].filter(Boolean).join('\u2002')}</span>` : ''}</div>`;
+      }).join('');
       listHTML += `<div class="prow">
         <span class="pnr">${nr}${hasDsc ? '<sup>*</sup>' : ''}</span>
         <div class="pinfo">
@@ -2334,6 +2340,7 @@ function openPrintView() {
           ${dates  ? `<span class="pdates">${dates}</span>` : ''}
           ${sp     ? `<span class="psp">${sp}</span>` : ''}
           ${parRef ? `<span class="ppar">${parRef}</span>` : ''}
+          ${sibsHTML ? `<div class="psibs-wrap"><span class="psibs-lbl">${lang==='de'?'Geschwister':lang==='en'?'Siblings':'Syskon'}:</span>${sibsHTML}</div>` : ''}
         </div></div>`;
     });
     listHTML += `</div>`;
@@ -2400,6 +2407,11 @@ function openPrintView() {
          font-size: 10pt; color: #333; flex-shrink: 0; padding-top: 1px; }
   .nname { font-weight: bold; font-size: 10pt; margin-bottom: 3px; }
   .ntext { font-size: 9.5pt; color: #333; line-height: 1.55; }
+  .psibs-wrap { width: 100%; margin-top: 3px; }
+  .psibs-lbl  { font-size: 8pt; text-transform: uppercase; letter-spacing: .5px;
+                color: #aaa; margin-right: 4px; }
+  .psib       { font-size: 9pt; color: #555; padding: 1px 0 1px 10px; }
+  .psib-d     { font-size: 8.5pt; color: #999; margin-left: 6px; }
   .footer { margin-top: 32px; font-size: 8pt; color: #bbb; text-align: center; }
 
   @media print {
@@ -3192,7 +3204,7 @@ function render(rootId) {
       card.className = 'card c-' + p.c + (isFocus ? ' focused' : '');
       card.dataset.id = id;
       card.style.left = pos_p.x + 'px';
-      card.style.top  = pos_p.y + 'px';
+      card.style.top  = (pos_p.y - LEAF_H / 2) + 'px';   // grov uppskattning; rAF sätter exakt värde
 
       // Top row: avatar + info
       const cardTop = document.createElement('div');
@@ -3398,7 +3410,7 @@ function render(rootId) {
         const extraGap = (familyGroup > prevFamilyGroup && prevFamilyGroup >= 0) ? sep : 0;
         const minY = prevBot + GAP + extraGap + h / 2;
         if (pos[id].y < minY) pos[id].y = minY;
-        card.style.top = pos[id].y + 'px';
+        card.style.top = (pos[id].y - h / 2) + 'px';   // top = center - height/2
         prevBot = pos[id].y + h / 2;
         prevFamilyGroup = familyGroup;
         prevColor = curColor;
@@ -3438,8 +3450,8 @@ function render(rootId) {
         if (topCur + shift < topMin) shift = topMin - topCur;
 
         if (Math.abs(shift) > 0.5) {
-          if (fId && fCard && fCur !== null) { pos[fId].y += shift; fCard.style.top = pos[fId].y + 'px'; }
-          if (mId && mCard && mCur !== null) { pos[mId].y += shift; mCard.style.top = pos[mId].y + 'px'; }
+          if (fId && fCard && fCur !== null) { pos[fId].y += shift; fCard.style.top = (pos[fId].y - fH / 2) + 'px'; }
+          if (mId && mCard && mCur !== null) { pos[mId].y += shift; mCard.style.top = (pos[mId].y - mH / 2) + 'px'; }
         }
 
         if      (mId && pos[mId]) prevBot = pos[mId].y + mH / 2;
@@ -3450,7 +3462,7 @@ function render(rootId) {
     // Expand canvas/wrap if cards were pushed below the original bounds
     let maxBot = 0;
     wrap.querySelectorAll('.card').forEach(c => {
-      const b = parseFloat(c.style.top) + c.offsetHeight / 2;
+      const b = parseFloat(c.style.top) + c.offsetHeight;   // top + full height = underkant
       if (b > maxBot) maxBot = b;
     });
     const needed = maxBot + PAD_Y;
