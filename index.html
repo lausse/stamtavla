@@ -3747,19 +3747,22 @@ window.handleCredentialResponse = async function(response) {
   if (approved) {
     isAdmin = authUser.email.toLowerCase() === LASSE_EMAIL_CLIENT;
     closeApplyModal();
-    renderPhotoIndicators();
-    updateAllAvatars();
     if (isAdmin)
       document.getElementById('admin-btn').style.display = 'inline-block';
-      document.getElementById('add-person-btn').style.display = 'inline-block';
+    document.getElementById('add-person-btn').style.display = 'inline-block';
 
-    // Centrera trädet på den inloggade personen om de finns i trädet
-    const matchedId = matchUserToTree(authUser.name);
-    if (matchedId && matchedId !== currentRoot) {
-      focusPerson(matchedId); // renderar träd + panel automatiskt
-    } else {
-      renderDetail(currentRoot);
-    }
+    // Ladda foton med autentisering, rendera sedan träd + panel
+    loadPhotos().then(() => {
+      renderPhotoIndicators();
+      updateAllAvatars();
+      // Centrera trädet på den inloggade personen om de finns i trädet
+      const matchedId = matchUserToTree(authUser.name);
+      if (matchedId && matchedId !== currentRoot) {
+        focusPerson(matchedId);
+      } else {
+        renderDetail(currentDetailId);
+      }
+    });
   } else {
     // Inloggad men ej godkänd: visa ansökningsformuläret (med namn förifyllt från Google)
     const nameEl = document.getElementById('apply-name');
