@@ -874,8 +874,10 @@ async function saveDesc(personId, sv, de, en) {
 }
 async function loadDescOverride(personId) {
   if (!db) return null;
-  const d = await db.collection('persons').doc(personId).get();
-  return d.exists ? d.data() : null;
+  try {
+    const d = await db.collection('persons').doc(personId).get();
+    return d.exists ? d.data() : null;
+  } catch(e) { return null; }
 }
 
 // ════════════════════════════════════════════════════
@@ -1597,6 +1599,11 @@ detPanel.addEventListener('touchend', e => {
 async function renderDetail(id) {
   showDetailPanel();
   if (!id || !P[id]) { detPanel.innerHTML = `<div class="det-empty">${LANG[lang].detEmpty}</div>`; return; }
+  try { await _renderDetailInner(id); } catch(e) {
+    detPanel.innerHTML = `<div style="padding:16px"><strong>${P[id] ? P[id].n : id}</strong><br><span style="font-size:12px;color:#aaa">${e.message||'Fel vid rendering'}</span></div>`;
+  }
+}
+async function _renderDetailInner(id) {
   const p   = P[id];
   const col = COLORS[p.c] || '#bbb';
 
