@@ -829,7 +829,7 @@ window.migratePhotoUrls = async function() {
   let total = 0, updated = 0, failed = 0;
 
   for (const [pid, items] of Object.entries(PHOTOS)) {
-    if (!items?.length) continue;
+    if (!items || !items.length) continue;
     let changed = false;
     const newItems = await Promise.all(items.map(async item => {
       const url  = typeof item === 'string' ? item : item.url;
@@ -1421,8 +1421,8 @@ function aliveRange(p) {
   const died  = deathYear(p);
   const b     = born  !== 9999 ? born  : null;
   const d     = died  !== null ? died  : null;
-  const start = b ?? (d ? d - 80 : 1800);
-  const end   = d ?? (b ? b + 105 : 2100);
+  const start = b != null ? b : (d ? d - 80 : 1800);
+  const end   = d != null ? d : (b ? b + 105 : 2100);
   return [start, end];
 }
 
@@ -1550,7 +1550,7 @@ function getSpouses(id) {
     const other = (c.fi === id) ? c.mi : c.fi;
     if (other && P[other] && !seen.has(other)) { seen.add(other); result.push(P[other]); }
   });
-  (P[id]?.sp || []).forEach(sid => {
+  (P[id] && P[id].sp || []).forEach(sid => {
     if (P[sid] && !seen.has(sid)) { seen.add(sid); result.push(P[sid]); }
   });
   return result;
@@ -1661,7 +1661,7 @@ async function renderDetail(id) {
     const inferredSpouseIds = new Set(
       getChildren(id).map(c => (c.fi === id) ? c.mi : c.fi).filter(Boolean)
     );
-    const explicitSpouseIds = new Set(P[id]?.sp || []);
+    const explicitSpouseIds = new Set(P[id] && P[id].sp || []);
     const spouseChecks = otherPersons.map(([cid, cp]) => {
       const isInferred = inferredSpouseIds.has(cid);
       const isExplicit = explicitSpouseIds.has(cid);
@@ -1913,22 +1913,22 @@ async function renderDetail(id) {
 }
 
 window.doSaveDesc = async function(id) {
-  const sv = document.getElementById('det-edit-sv')?.value || '';
-  const de = document.getElementById('det-edit-de')?.value || '';
-  const en = document.getElementById('det-edit-en')?.value || '';
+  const sv = (document.getElementById('det-edit-sv')||{}).value || '';
+  const de = (document.getElementById('det-edit-de')||{}).value || '';
+  const en = (document.getElementById('det-edit-en')||{}).value || '';
   await saveDesc(id, sv, de, en);
   renderDetail(id);
 };
 window.doSavePerson = async function(id) {
-  const sv   = document.getElementById('det-edit-sv')?.value || '';
-  const de   = document.getElementById('det-edit-de')?.value || '';
-  const en   = document.getElementById('det-edit-en')?.value || '';
-  const b    = (document.getElementById('det-edit-b')?.value || '').trim();
-  const d    = (document.getElementById('det-edit-d')?.value || '').trim();
-  const md   = (document.getElementById('det-edit-md')?.value || '').trim();
-  const name = (document.getElementById('det-edit-name')?.value || '').trim();
-  const nick = (document.getElementById('det-edit-nick')?.value || '').trim();
-  const till = (document.getElementById('det-edit-till')?.value || '').trim();
+  const sv   = (document.getElementById('det-edit-sv')||{}).value || '';
+  const de   = (document.getElementById('det-edit-de')||{}).value || '';
+  const en   = (document.getElementById('det-edit-en')||{}).value || '';
+  const b    = ((document.getElementById('det-edit-b')||{}).value || '').trim();
+  const d    = ((document.getElementById('det-edit-d')||{}).value || '').trim();
+  const md   = ((document.getElementById('det-edit-md')||{}).value || '').trim();
+  const name = ((document.getElementById('det-edit-name')||{}).value || '').trim();
+  const nick = ((document.getElementById('det-edit-nick')||{}).value || '').trim();
+  const till = ((document.getElementById('det-edit-till')||{}).value || '').trim();
 
   // Spara text + datum + namn + smeknamn
   const data = { descSv: sv, descDe: de, descEn: en };
@@ -1953,12 +1953,12 @@ window.doSavePerson = async function(id) {
 
   // Spara barn (fi/mi)
   const p = P[id];
-  const isFather = p?.s === 'M';
+  const isFather = p && p.s === 'M';
   const barnEls = [...document.querySelectorAll('#det-edit-children input[data-childid]')];
   for (const el of barnEls) {
     const cid = el.dataset.childid;
     const field = isFather ? 'fi' : 'mi';
-    const cur = P[cid]?.[field];
+    const cur = P[cid] && P[cid][field];
     if (el.checked && cur !== id) {
       await db.collection('persons').doc(cid).set({ [field]: id }, { merge: true });
       if (P[cid]) P[cid][field] = id;
@@ -1969,7 +1969,7 @@ window.doSavePerson = async function(id) {
   }
 
   // Spara explicita partners (sp-fält, bidirektionellt)
-  const oldExplicitSp = new Set(P[id]?.sp || []);
+  const oldExplicitSp = new Set(P[id] && P[id].sp || []);
   const spEls = [...document.querySelectorAll('#det-edit-sp-list input[data-spouseid]')];
   const newSp = spEls.filter(el => el.checked).map(el => el.dataset.spouseid);
   const newSpSet = new Set(newSp);
@@ -1977,10 +1977,10 @@ window.doSavePerson = async function(id) {
   if (P[id]) P[id].sp = newSp;
   for (const sid of newSpSet) {
     if (!oldExplicitSp.has(sid)) {
-      const otherSp = [...new Set([...(P[sid]?.sp || []), id])];
+      const otherSp = [...new Set([...(P[sid] && P[sid].sp || []), id])];
       const updates = { sp: otherSp };
       // Ärv bakgrundsfärg om partnern saknar egen (unk)
-      if (P[sid]?.c === 'unk' && P[id]?.c) {
+      if (P[sid] && P[sid].c === 'unk' && P[id] && P[id].c) {
         updates.c = P[id].c;
         if (P[sid]) P[sid].c = updates.c;
       }
@@ -1990,7 +1990,7 @@ window.doSavePerson = async function(id) {
   }
   for (const sid of oldExplicitSp) {
     if (!newSpSet.has(sid)) {
-      const otherSp = (P[sid]?.sp || []).filter(x => x !== id);
+      const otherSp = (P[sid] && P[sid].sp || []).filter(x => x !== id);
       await db.collection('persons').doc(sid).set({ sp: otherSp.length ? otherSp : null }, { merge: true });
       if (P[sid]) P[sid].sp = otherSp;
     }
@@ -2002,8 +2002,8 @@ window.doSavePerson = async function(id) {
     const cid = el.dataset.sibid;
     if (el.checked) {
       const update = {};
-      if (p?.fi && P[cid]?.fi !== p.fi) update.fi = p.fi;
-      if (p?.mi && P[cid]?.mi !== p.mi) update.mi = p.mi;
+      if (p && p.fi && P[cid] && P[cid].fi !== p.fi) update.fi = p.fi;
+      if (p && p.mi && P[cid] && P[cid].mi !== p.mi) update.mi = p.mi;
       if (Object.keys(update).length) {
         await db.collection('persons').doc(cid).set(update, { merge: true });
         if (P[cid]) Object.assign(P[cid], update);
@@ -2016,7 +2016,7 @@ window.doSavePerson = async function(id) {
 };
 window.doAddComment = async function(id) {
   const el = document.getElementById('det-cmt-input');
-  const text = el?.value.trim();
+  const text = el && el.value.trim();
   if (!text) return;
   await saveComment(id, text);
   if (el) el.value = '';
@@ -2197,8 +2197,8 @@ function openPrintView() {
   for (let g = slots.length - 2; g >= 0; g--) {
     slots[g].forEach((id, i) => {
       if (!id) return;
-      const fY = (slots[g+1]?.[i*2]   && ppos[slots[g+1][i*2]])   ? ppos[slots[g+1][i*2]].y   : null;
-      const mY = (slots[g+1]?.[i*2+1] && ppos[slots[g+1][i*2+1]]) ? ppos[slots[g+1][i*2+1]].y : null;
+      const fY = (slots[g+1] && slots[g+1][i*2]   && ppos[slots[g+1][i*2]])   ? ppos[slots[g+1][i*2]].y   : null;
+      const mY = (slots[g+1] && slots[g+1][i*2+1] && ppos[slots[g+1][i*2+1]]) ? ppos[slots[g+1][i*2+1]].y : null;
       if (fY !== null && mY !== null) ppos[id].y = (fY + mY) / 2;
       else if (fY !== null) ppos[id].y = fY;
       else if (mY !== null) ppos[id].y = mY;
@@ -3050,7 +3050,7 @@ window.editPhotoPersons = function(photoUrl, photoText, currentPersonId) {
 
   // Auto-scroll synkront — ingen animation, inget fokus
   const list = document.getElementById('edit-photo-checklist');
-  const firstChecked = list?.querySelector('input:checked');
+  const firstChecked = list && list.querySelector('input:checked');
   if (firstChecked && list) {
     const row = firstChecked.closest('[data-pid]');
     if (row) list.scrollTop = Math.max(0, row.offsetTop - list.clientHeight / 3);
@@ -3086,7 +3086,7 @@ window.savePhotoPersonEdits = async function(photoUrl, currentPersonId) {
   const prev    = new Set(Object.keys(PHOTOS).filter(pid =>
     (PHOTOS[pid] || []).some(item => (typeof item === 'string' ? item : item.url) === photoUrl)
   ));
-  const newText = (document.getElementById('edit-photo-text')?.value || '').trim();
+  const newText = ((document.getElementById('edit-photo-text')||{}).value || '').trim();
 
   // Spara ordning från draggable chips
   const chipsEl = document.getElementById('edit-photo-chips');
@@ -3432,7 +3432,7 @@ function render(rootId) {
         if (!card) return;
         const h = card.offsetHeight;
         const familyGroup = Math.floor(j / 2);
-        const curColor = P[id]?.c || '';
+        const curColor = P[id] && P[id].c || '';
         const colorChanged = prevColor && curColor && prevColor !== curColor;
         const sep = colorChanged ? FAMILY_SEP_DIFF : FAMILY_SEP_SAME;
         const extraGap = (familyGroup > prevFamilyGroup && prevFamilyGroup >= 0) ? sep : 0;
@@ -3472,7 +3472,7 @@ function render(rootId) {
         let shift = childY - pairMid; // positive = down, negative = up
 
         // Clamp: topmost card in pair can't go above the previous pair's bottom
-        const topCur = fCur ?? mCur;
+        const topCur = fCur != null ? fCur : mCur;
         const topH   = fCur !== null ? fH : mH;
         const topMin = prevBot + GAP + topH / 2;
         if (topCur + shift < topMin) shift = topMin - topCur;
@@ -4026,7 +4026,7 @@ function renderAdminRows(rows) {
     return;
   }
   const order = { 'VÄNTAR': 0, 'GODKÄND': 1, 'NEKAD': 2 };
-  rows.sort((a, b) => (order[a.status] ?? 3) - (order[b.status] ?? 3));
+  rows.sort((a, b) => (order[a.status] != null ? order[a.status] : 3) - (order[b.status] != null ? order[b.status] : 3));
 
   const html = rows.map(row => {
     const badgeCls = row.status === 'GODKÄND' ? 'badge-ok'
@@ -4049,7 +4049,7 @@ function renderAdminRows(rows) {
 }
 
 function escHtml(s) {
-  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+  return String(s != null ? s : '').replace(/&/g,'&amp;').replace(/</g,'&lt;')
                         .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
@@ -4079,7 +4079,7 @@ function renderPhotoIndicators() {
   document.querySelectorAll('.card[data-id]').forEach(card => {
     if (card.querySelector('.photo-dot')) return;
     const id = card.dataset.id;
-    if (!(PHOTOS[id]?.length)) return; // bara om det finns foton
+    if (!(PHOTOS[id] && PHOTOS[id].length)) return; // bara om det finns foton
     const dot = document.createElement('button');
     dot.className = 'photo-dot';
     dot.textContent = '📷';
@@ -4146,7 +4146,7 @@ function ensurePickerClient() {
     callback: (resp) => {
       if (resp.error) { showToast('Google Photos: ' + resp.error); return; }
       gPickerToken = resp.access_token;
-      window._gPickerCallback?.();
+      window._gPickerCallback && window._gPickerCallback();
     }
   });
 }
@@ -4196,7 +4196,7 @@ window.openGPhotoPicker = function(personId) {
             done = true;
             clearInterval(pollTimer);
             clearInterval(closeCheck);
-            popup?.close();
+            popup && popup.close();
             await handlePickerDone(session.id, personId);
           }
         } catch(e) { /* ignorera poll-fel */ }
@@ -4204,7 +4204,7 @@ window.openGPhotoPicker = function(personId) {
 
       // Kolla om popup stängs manuellt
       const closeCheck = setInterval(() => {
-        if (popup?.closed && !done) {
+        if (popup && popup.closed && !done) {
           clearInterval(pollTimer);
           clearInterval(closeCheck);
           container.innerHTML = '<div style="font-size:11px;color:#aaa">Stängd utan val.</div>';
@@ -4249,8 +4249,8 @@ async function handlePickerDone(sessionId, personId) {
     const item = (itemsData.mediaItems || [])[0];
     if (!item) { container.innerHTML = '<div style="font-size:11px;color:#aaa">Inget foto valdes.</div>'; return; }
 
-    const baseUrl  = item.mediaFile?.baseUrl;
-    const filename = item.mediaFile?.filename || `foto_${Date.now()}.jpg`;
+    const baseUrl  = item.mediaFile && item.mediaFile.baseUrl;
+    const filename = item.mediaFile && item.mediaFile.filename || `foto_${Date.now()}.jpg`;
 
     container.innerHTML = '<div style="font-size:11px;color:#888">Komprimerar bild…</div>';
 
