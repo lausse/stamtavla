@@ -1824,8 +1824,7 @@ async function _renderDetailInner(id) {
       <h4>Foton</h4>
       <div id="det-photo-list">`;
     if (items.length === 0) {
-      html += `<div class="det-note" style="margin-bottom:6px">Inga foton kopplade ännu.</div>
-      <div style="font-size:10px;color:#bbb;margin-top:4px">${_photoLoadLog.join(' | ')}</div>`;
+      html += `<div class="det-note" style="margin-bottom:6px">Inga foton kopplade ännu.</div>`;
     } else {
       items.forEach((item, idx) => {
         const url   = typeof item === 'string' ? item : item.url;
@@ -2578,32 +2577,26 @@ function updateAllAvatars() {
   });
 }
 
-let _photoLoadLog = [];
 async function loadPhotos() {
-  _photoLoadLog = [];
   // Försök Firebase först, falla tillbaka på Apps Script / photos.json
   if (db) {
     try {
       const snap = await db.collection('photos').get();
-      const count = snap.size;
       snap.forEach(doc => { PHOTOS[doc.id] = doc.data().items || []; });
-      _photoLoadLog.push('Firebase OK: ' + count + ' docs');
       updateAllAvatars();
       return;
-    } catch(e) { _photoLoadLog.push('Firebase FEL: ' + e.message); }
-  } else { _photoLoadLog.push('Firebase: db=null'); }
+    } catch(e) {}
+  }
   try {
     const r = await fetch(`${APPS_SCRIPT_URL}?action=get_photos`);
     const d = await r.json();
-    if (d && typeof d === 'object' && !d.error) { PHOTOS = d; _photoLoadLog.push('AppsScript OK'); updateAllAvatars(); return; }
-    _photoLoadLog.push('AppsScript returnerade: ' + JSON.stringify(d).slice(0,80));
-  } catch(e) { _photoLoadLog.push('AppsScript FEL: ' + e.message); }
+    if (d && typeof d === 'object' && !d.error) { PHOTOS = d; updateAllAvatars(); return; }
+  } catch(e) {}
   try {
     const r = await fetch('photos.json');
     PHOTOS = await r.json();
-    _photoLoadLog.push('photos.json OK (tom fallback)');
     updateAllAvatars();
-  } catch(e) { _photoLoadLog.push('photos.json FEL: ' + e.message); }
+  } catch(e) {}
 }
 // ════ AVATAR CROP ════
 let AVATAR_CROPS = {};
